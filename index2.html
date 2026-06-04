@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=no">
+    <title>Wadhwa Sir's Classroom - Quantifiers</title>
+    
+    <script>
+      MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }, options: { enableMenu: false, renderActions: { addMenu: [] } }, startup: { typeset: true }, svg: { fontCache: 'global' } };
+    </script>
+    <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" onerror="console.log('MathJax offline')"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* === SECURITY: DISABLE TEXT SELECTION & LONG PRESS === */
+        body {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+        }
+
+        /* === VARIABLES === */
+        :root {
+            --bg-color: #f8f9fa; --container-bg: #ffffff; --text-main: #1a1a1a;
+            --text-muted: #555555; --input-bg: #f0f2f5; --border-color: #e0e0e0;
+            --header-bg: #ffffff; --shadow-color: rgba(0, 0, 0, 0.1);
+            --accent-orange: #e68a00; --board-bg: #fdfdfd;
+        }
+
+        .dark-mode {
+            --bg-color: #000000; --container-bg: #0d1b2a; --text-main: #ffffff;
+            --text-muted: #a0aab2; --input-bg: rgba(255, 255, 255, 0.05); --border-color: rgba(255, 255, 255, 0.1);
+            --header-bg: #1b263b; --shadow-color: rgba(0, 0, 0, 0.8); --board-bg: #0b141e;
+        }
+
+        * { box-sizing: border-box; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Poppins', sans-serif !important; transition: background-color 0.3s, color 0.3s, border-color 0.3s; }
+
+        #app-container { width: 100%; max-width: 420px; height: 100vh; background: var(--container-bg); position: relative; box-shadow: 0 0 20px var(--shadow-color); display: flex; flex-direction: column; overflow: hidden; }
+
+        /* === GLOBAL MENUS === */
+        /* 3 dots is on the left, opens from top-left */
+        .dropdown-menu { position: absolute; top: 118px; left: 12px; right: auto; background: var(--header-bg); border: 1px solid var(--border-color); border-radius: 15px; padding: 10px; width: 220px; box-shadow: 0 10px 30px var(--shadow-color); z-index: 104; display: flex; flex-direction: column; gap: 10px; transform: scale(0); opacity: 0; transition: all 0.3s ease; pointer-events: none; transform-origin: top left; }
+        .dropdown-menu.active { transform: scale(1); opacity: 1; pointer-events: all; }
+
+        /* === SUBTOPIC MENU === */
+        /* 3 lines is on the right, opens from top-right */
+        .subtopic-dropdown { position: absolute; top: 118px; right: 12px; left: auto; background: var(--header-bg); border-radius: 15px; padding: 10px; width: 220px; box-shadow: 0 10px 30px var(--shadow-color); z-index: 102; display: flex; flex-direction: column; gap: 10px; transform: scale(0); opacity: 0; transition: all 0.3s ease; border: 2px solid var(--accent-orange); max-height: 400px; overflow-y: auto; pointer-events: none; transform-origin: top right; }
+        .subtopic-dropdown.active { transform: scale(1); opacity: 1; pointer-events: all; }
+        
+        .subtopic-btn { background: var(--input-bg); color: var(--text-main); border: none; padding: 10px 15px; border-radius: 12px; font-weight: 600; font-size: 0.85rem; display: flex; align-items: center; gap: 12px; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .subtopic-btn:active { transform: scale(0.95); }
+
+        .drop-btn { width: 100%; padding: 12px 15px; border: none; border-radius: 10px; font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 12px; cursor: pointer; color: white; }
+        .nav-btn { font-size: 0.95rem; }
+        .nav-btn:disabled { background: var(--text-muted) !important; cursor: not-allowed; opacity: 0.5; box-shadow: none; }
+        
+        #btn-theme { background-color: #000000; color: #ffffff; }
+        body.dark-mode #btn-theme { background-color: #ffffff; color: #000000; }
+        .btn-exit { background: linear-gradient(135deg, #FF416C, #FF4B2B); }
+
+        /* === SUBTOPIC READING SCREEN & PROGRESS BAR === */
+        #subtopic-page { background: var(--board-bg); position: relative; display: flex; flex-direction: column; min-height: 100%; }
+        
+        .header-top{background:var(--header-bg);padding:14px 14px 10px;}
+        .brand{color:var(--text-muted);font-size:0.95rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;text-align:left;}
+        .brand-big{color:var(--text-main);font-size:2.6rem;font-weight:900;line-height:1;margin:2px 0 10px;text-align:left;letter-spacing:0.5px;}
+        .subtopic-bar{display:grid;grid-template-columns:50px 1fr 50px;align-items:center;gap:8px;padding:0 4px;margin-top:8px;}
+        
+        .icon-circle{width:44px;height:44px;border-radius:50%;background:var(--input-bg);border:1px solid var(--border-color);display:flex;align-items:center;justify-content:center;color:var(--text-main);flex-shrink:0;box-shadow:0 3px 10px rgba(0,0,0,0.5);position:relative!important; cursor: pointer; margin: 0 auto;}
+        .icon-circle:active { transform: scale(0.95); }
+        #subtopic-menu-btn{color:#f59e0b;}
+        .subtopic-title{grid-column:2;text-align:center;color:var(--text-main);font-weight:800;font-size:1.0rem;text-transform:uppercase;letter-spacing:0.5px;line-height:1.2;padding:0 6px;}
+
+        .lesson-bar{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--container-bg);border-top:1px solid rgba(255,255,255,0.06);border-bottom:1px solid rgba(255,255,255,0.06);}
+        .lesson-name{color:#f59e0b;font-weight:800;font-size:1.25rem;}
+        
+        .academic-timer{background:var(--input-bg);color:var(--text-main);padding:4px 9px;border-radius:9px;font-size:0.75rem;font-weight:700;display:flex;align-items:center;gap:5px;min-width:64px;justify-content:center;border:1px solid var(--border-color);}
+        .academic-timer svg{color:#f59e0b;}
+
+        .controls{display:flex;background:var(--header-bg);padding:8px 6px;gap:6px;border-bottom:1px solid rgba(255,255,255,0.05);}
+        .controls .read-btn{flex:1;background:transparent;border:none;color:var(--text-muted);font-weight:700;padding:10px 4px;font-size:0.95rem;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:8px;cursor:pointer;white-space:nowrap;}
+        .controls .read-btn.active{color:#f59e0b;text-shadow:0 0 12px rgba(245,158,11,0.8);background:rgba(245,158,11,0.08);}
+        #btn-read-action { background: var(--accent-orange); color: white; min-width: 100px; }
+
+        @keyframes breathe { 0% { box-shadow: 0 0 5px #38ef7d; transform: scale(1); } 50% { box-shadow: 0 0 20px #38ef7d; transform: scale(1.05); } 100% { box-shadow: 0 0 5px #38ef7d; transform: scale(1); } }
+        .btn-breathe { animation: breathe 1.5s infinite; background: linear-gradient(135deg, #11998e, #38ef7d) !important; color: white !important; }
+
+        .board-area { flex: 1; padding: 20px; padding-bottom: 80px; overflow-y: auto; position: relative; font-size: 1.1rem; line-height: 1.6; font-weight: 500; color: #2c3e50; }
+        body.dark-mode .board-area { color: #dcdde1; }
+
+        .text-3d-card { background: linear-gradient(145deg, var(--input-bg), var(--header-bg)); border: 1px solid var(--border-color); padding: 20px; border-radius: 15px; box-shadow: 5px 5px 15px var(--shadow-color), inset -2px -2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; display: inline-block; width: 100%; position: relative; overflow-x: auto; overflow-y: hidden; min-height: 150px; white-space: normal; word-break: break-word;}
+
+        /* === ACADEMIC TEXT FORMATTING === */
+        .lesson-heading { font-weight: 800; font-size: 1.25rem; color: var(--accent-orange); margin-bottom: 8px; line-height: 1.4; display: block; border-bottom: 2px solid var(--accent-orange); padding-bottom: 5px; }
+        body.dark-mode .lesson-heading { color: #f39c12; border-bottom-color: #f39c12; }
+        .lesson-subheading { font-weight: 700; color: #0052D4; background: rgba(0, 82, 212, 0.1); padding: 6px 12px; border-left: 4px solid #0052D4; border-radius: 4px; margin-top: 15px; margin-bottom: 10px; display: inline-block; width: 100%; }
+        body.dark-mode .lesson-subheading { color: #66a6ff; background: rgba(102, 166, 255, 0.15); border-left-color: #66a6ff; }
+        .list-item { display: block; margin-top: 8px; margin-bottom: 8px; padding-left: 15px; position: relative; }
+
+        .cursor::after { content: '|'; animation: blink 1s step-end infinite; color: var(--accent-orange); }
+        .cursor.reading-done::after { display: none; }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        .hl-orange { color: var(--accent-orange); font-weight: 700; }
+        .hl-blue { color: #0052D4; font-weight: 700; }
+        body.dark-mode .hl-blue { color: #66a6ff; }
+        .hl-green { color: #11998e; font-weight: 700; }
+        body.dark-mode .hl-green { color: #38ef7d; }
+
+        .choice-box { margin-top: 10px; display: none; flex-direction: column; gap: 12px; animation: fadeIn 0.5s ease; padding-bottom: 20px; }
+        @keyframes fadeIn { from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
+
+        @keyframes attentionPulse {
+            0% { box-shadow: 0 0 0 0 rgba(230, 138, 0, 0.7); transform: scale(1); }
+            70% { box-shadow: 0 0 0 15px rgba(230, 138, 0, 0); transform: scale(1.1); }
+            100% { box-shadow: 0 0 0 0 rgba(230, 138, 0, 0); transform: scale(1); }
+        }
+        .pulse-attention { animation: attentionPulse 1.5s infinite !important; background: var(--accent-orange) !important; color: white !important; }
+
+        /* === FOOTER - Wadhwa Sir's Classroom === */
+        #wsc-footer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 0.68rem;
+            padding: 6px 8px 7px;
+            background: var(--header-bg);
+            color: var(--text-muted);
+            border-top: 1px solid var(--border-color);
+            z-index: 200;
+            pointer-events: none;
+            letter-spacing: 0.3px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+
+        <div id="dropdown-menu" class="dropdown-menu">
+            <button id="btn-theme" class="drop-btn" onclick="toggleTheme()">
+                <i class="fa-solid fa-circle-half-stroke"></i> <span id="theme-text">Dark Mode</span>
+            </button>
+            <button id="btn-exit" class="drop-btn btn-exit" onclick="exitSubtopic()">
+                <i class="fa-solid fa-power-off"></i> Exit Subtopic
+            </button>
+        </div>
+
+        <div id="subtopic-dropdown" class="subtopic-dropdown">
+            <button class="subtopic-btn" onclick="jumpToLesson(0)" style="background: linear-gradient(135deg, #ff0844, #ffb199); color: white; box-shadow: 0 4px 15px rgba(255,8,68,0.4); text-transform: uppercase; letter-spacing: 0.5px;">
+                <i class="fa-solid fa-play"></i> Introduction
+            </button>
+            <button class="subtopic-btn" onclick="jumpToLesson(1)" style="background: linear-gradient(135deg, #8E2DE2, #4A00E0); color: white;">
+                <i class="fa-solid fa-chalkboard-user"></i> Explanation
+            </button>
+            <button class="subtopic-btn" onclick="jumpToLesson(4)" style="background: linear-gradient(135deg, #11998e, #38ef7d); color: white;">
+                <i class="fa-solid fa-list-ol"></i> Examples
+            </button>
+            <button class="subtopic-btn" onclick="jumpToLesson(5)" style="background: linear-gradient(135deg, #f12711, #f5af19); color: white;">
+                <i class="fa-solid fa-star"></i> Master Stroke
+            </button>
+        </div>
+
+        <div id="subtopic-page">
+            <div class="header-top">
+                <div class="brand">WADHWA SIR'S</div>
+                <div class="brand-big">CLASSROOM</div>
+                <div class="subtopic-bar">
+                    <button id="global-menu-btn" class="icon-circle" onclick="toggleDropdown(event, 'dropdown-menu')" aria-label="Menu">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+                    </button>
+                    <div class="subtopic-title" id="st-subtopic-name-display">QUANTIFIERS AND QUANTIFIED STATEMENTS</div>
+                    <button id="subtopic-menu-btn" class="icon-circle" onclick="toggleDropdown(event, 'subtopic-dropdown')" aria-label="Topics">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="lesson-bar">
+                <div class="lesson-name" id="st-subtitle-text">Introduction 🎓</div>
+                <div class="academic-timer" id="academic-timer">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 5h-2v6l5 3 .8-1.3-3.8-2.2V7z"/></svg>
+                    <span id="timer-display">00:00</span>
+                </div>
+            </div>
+            
+            <div class="controls">
+                <button class="read-btn" id="mode-full" onclick="setReadMode('full')" onmousedown="startFullReadPress(event)" ontouchstart="startFullReadPress(event)" onmouseup="cancelFullReadPress(event)" onmouseleave="cancelFullReadPress(event)" ontouchend="cancelFullReadPress(event)">Non Stop</button>
+                <button class="read-btn" id="btn-read-action" onclick="toggleReading()"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Play</button>
+                <button class="read-btn active" id="mode-sentence" onclick="setReadMode('sentence')">By Sentence</button>
+            </div>
+            
+            <div class="board-area" id="board-area">
+                <div class="text-3d-card">
+                    <span id="board-text" class="cursor"></span>
+                </div>
+                <div class="choice-box" id="choice-box"></div>
+            </div>
+        </div>
+        <div id="wsc-footer">© 2026 Wadhwa Sir's Classroom, Ulhasnagar. For personal study use only</div>
+    </div>
+
+    <script>
+        // === FULL SCREEN ENFORCEMENT ===
+        function enforceFullScreen() {
+            if (!document.fullscreenElement && !document.mozFullScreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
+                const docElm = document.documentElement;
+                if (docElm.requestFullscreen) { docElm.requestFullscreen().catch(()=>{}); } 
+                else if (docElm.webkitRequestFullscreen) { docElm.webkitRequestFullscreen().catch(()=>{}); }
+            }
+        }
+        document.body.addEventListener('click', enforceFullScreen);
+        document.body.addEventListener('touchstart', enforceFullScreen);
+
+        // === FORCE INDIAN ENGLISH MALE VOICE ===
+        let _indianVoiceReady = false;
+        function preloadIndianVoice() {
+            try {
+                window.speechSynthesis.getVoices();
+                _indianVoiceReady = true;
+            } catch(e) {}
+        }
+        preloadIndianVoice();
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.onvoiceschanged = preloadIndianVoice;
+        }
+
+        // === SUBTOPIC 8 DATA ONLY ===
+        const subtopicsData = {
+            7: {
+                lessonTitles: [
+                    "Introduction 🎓", "Professor Wadhwa's Explanation 💡", "Professor Wadhwa's Deep Explanation 🧠",
+                    "Professor Wadhwa's Innovative Explanation 🚀", "Professor Wadhwa's Examples 📝", "Master Stroke 🔥"
+                ],
+                lessons: [
+                    { 
+                        sentences: [
+                            "[H] 🎓 Professor Wadhwa's Introduction:",
+                            "Do you remember our discussion in Subtopic 1 about Open Sentences?",
+                            "We learned that a sentence like \\( x+5=8 \\) is NOT a statement because its truth value depends on \\( x \\). If \\( x=3 \\), it is True. If \\( x=4 \\), it is False.",
+                            "But what if we could mathematically force an open sentence to declare its exact conditions?",
+                            "What if we could boldly claim, 'For EVERY number in this set, \\( x+5=8 \\)' or 'There EXISTS at least one number in this set where \\( x+5=8 \\)'?",
+                            "Welcome to the powerful world of Quantifiers!"
+                        ]
+                    },
+                    { 
+                        sentences: [
+                            "[H] 💡 Professor Wadhwa's Formal Academic Explanation:",
+                            "[SH] Definitions:",
+                            "[L] • Quantifiers: The symbols which are used to denote the phrases 'for all' (or 'for every') and 'there exists' are called quantifiers.",
+                            "[L] • Universal Quantifier (\\( \\forall \\)): The symbol \\( \\forall \\) stands for 'for all' or 'for every'. If \\( p(x) \\) is an open sentence, \\( \\forall x\\in A \\), \\( p(x) \\) means \\( p(x) \\) is true for every element in set A.",
+                            "[L] A statement quantified by a universal quantifier is true if all objects in the collection satisfy the condition. And it is false if at least one object in the collection does not satisfy the condition.",
+                            "[L] • Existential Quantifier (\\( \\exists \\)): The symbol \\( \\exists \\) stands for 'there exists'. The statement \\( \\exists x\\in A \\), \\( p(x) \\) means there exists at least one element \\( x \\) in set A for which \\( p(x) \\) is true.",
+                            "[L] A statement quantified by an existential quantifier is true if at least one object in the collection satisfies the condition. And it is false if no object in the collection satisfies the condition.",
+                            "[L] • Quantified Statement: An open sentence with a quantifier becomes a statement and is called a quantified statement. Every quantified statement corresponds to a collection and a condition."
+                        ]
+                    },
+                    { 
+                        sentences: [
+                            "[H] 🧠 Professor Wadhwa's Intuitive Deep Dive:",
+                            "[SH] Think of a Strict Principal vs. a Relaxed Scout!",
+                            "The Universal Quantifier (\\( \\forall \\)) is the Strict Principal. If the Principal says, 'EVERY student in this classroom is wearing a tie,' they demand perfection!",
+                            "If even one single student is missing a tie, the Principal's statement is completely False!",
+                            "The Existential Quantifier (\\( \\exists \\)) is the Relaxed Scout. The Scout looks into the classroom and says, 'There exists AT LEAST ONE student wearing a tie.'",
+                            "The Scout does not care if 49 students forgot their ties. As long as he spots just one kid with a tie, his statement is True!"
+                        ]
+                    },
+                    { 
+                        sentences: [
+                            "[H] 🚀 Professor Wadhwa's Application Approach:",
+                            "In Database Searching and E-Commerce, quantifiers run behind the scenes constantly!",
+                            "Imagine searching Amazon for a new phone.",
+                            "If you apply the filter 'Show me phones where RAM is 8GB', the database uses the Existential Quantifier (\\( \\exists \\)) to scan its millions of products.",
+                            "It asks: 'Does there exist at least one phone meeting this condition?' and lists them for you.",
+                            "However, if Amazon runs a site-wide security check to ensure 'Every single user password is encrypted,' it uses a Universal Quantifier (\\( \\forall \\)) script.",
+                            "If it finds even one unencrypted password, the entire security test fails!"
+                        ]
+                    },
+                    { 
+                        sentences: [
+                            "[H] 📝 Professor Wadhwa's Comprehensive Examples:",
+                            "[SH] 3 Distinct Examples",
+                            "[L] Example 1: The Universal Quantifier (\\( \\forall \\))",
+                            "Let set \\( A=\\{1,2,3\\} \\). Statement: \\( \\forall x\\in A, x<5 \\).",
+                            "Analysis: We must check every element in A. Is \\( 1<5 \\)? Yes. Is \\( 2<5 \\)? Yes. Is \\( 3<5 \\)? Yes. Because it works for all elements, this Quantified Statement is True.",
+                            "[L] Example 2: The Universal Quantifier Failing",
+                            "Let set \\( A=\\{1,2,3\\} \\). Statement: \\( \\forall x\\in A, x<3 \\).",
+                            "Analysis: Is \\( 1<3 \\)? Yes. Is \\( 2<3 \\)? Yes. Is \\( 3<3 \\)? No! Since the condition fails for \\( x=3 \\), the Principal is angry. This Quantified Statement is False.",
+                            "[L] Example 3: The Existential Quantifier (\\( \\exists \\))",
+                            "Let set \\( A=\\{2,4,7,9\\} \\). Statement: \\( \\exists x\\in A \\) such that \\( x \\) is an odd number.",
+                            "Analysis: The Scout looks for just one odd number. He checks 2 (no), 4 (no), but then he finds 7! Since 7 is an odd number in set A, the condition is met. This Quantified Statement is True.",
+                            "[H] 📊 Professor Wadhwa's Deep Dive: Masterclass Examples",
+                            "Let us strictly master the official Masterclass Examples to learn how to properly present these proofs in the board exams.",
+                            "[SH] Determining Truth Value",
+                            "Q.1. If \\( A=\\{1,2,3,4,5,6,7\\} \\), determine the truth value of the following quantified statements.",
+                            "[L] i) \\( \\exists x\\in A \\) such that \\( x-4=3 \\)",
+                            "[SH] Solution:",
+                            "For \\( x=7 \\), we have \\( 7-4=3 \\).",
+                            "Since \\( x=7 \\) satisfies the equation \\( x-4=3 \\), the given statement is true.",
+                            "Therefore, its truth value is T.",
+                            "[L] ii) \\( \\forall x\\in A, x+1\\ge3 \\)",
+                            "[SH] Solution:",
+                            "For \\( x=1 \\), \\( x+1=1+1=2 \\), which is not greater than or equal to 3.",
+                            "Since \\( x+1\\ge3 \\) is not true for \\( x=1 \\), the given statement is false.",
+                            "Therefore, its truth value is F.",
+                            "[L] iii) \\( \\forall x\\in A, 8-x\\le7 \\)",
+                            "[SH] Solution:",
+                            "Let us test the elements. For each \\( x\\in A \\), \\( 8-x\\le7 \\) is true.",
+                            "Therefore, the given statement is true and its truth value is T.",
+                            "[L] iv) \\( \\exists x\\in A \\) such that \\( x+8=16 \\)",
+                            "[SH] Solution:",
+                            "There is no \\( x \\) in A which satisfies \\( x+8=16 \\).",
+                            "Therefore, the given statement is false and its truth value is F."
+                        ]
+                    },
+                    { 
+                        sentences: [
+                            "[H] 🔥 Professor Wadhwa's Master Stroke:",
+                            "[SH] PRO TIP: Negating Quantifiers!",
+                            "The board examiners love to test if you know how to negate a quantified statement. This rule is simple but powerful: When you apply a Negation (\\( \\sim \\)) to a quantified statement, the quantifiers swap places!",
+                            "[L] • The negation of \\( \\forall x\\in A, p(x) \\) is \\( \\exists x\\in A, \\sim p(x) \\)",
+                            "[L] • The negation of \\( \\exists x\\in A, p(x) \\) is \\( \\forall x\\in A, \\sim p(x) \\)",
+                            "[SH] Example:",
+                            "Negate 'All natural numbers are positive.'",
+                            "Do NOT write 'No natural numbers are positive.'",
+                            "The correct logical opposite is: 'There exists at least one natural number which is not positive.'"
+                        ]
+                    }
+                ]
+            }
+        };
+
+        // --- States ---
+        let currentSubtopicIndex = 7; // Specifically forcing Subtopic 8 logic
+        let currentLessonIndex = 0;
+        let currentSentenceIndex = 0;
+        let isDarkMode = false;
+        
+        let ttsState = 'stopped'; 
+        let readMode = 'sentence';
+        let typeInterval;
+        let currentUtterance = null;
+        
+        let charIdx = 0;
+        let currentRawText = "";
+        let currentStyledHTML = "";
+        let currentSpan = null;
+        let typeSpeed = 35; 
+
+        // Long Press & Timer States
+        let fullReadTimer = null;
+        let isLongPressFired = false;
+        let readTimerInterval = null;
+        let estimatedTotalSeconds = 0;
+        let currentTimerSeconds = 0;
+
+        window.onload = () => {
+            jumpToLesson(0, true);
+        };
+
+        function toggleDropdown(e, menuId) {
+            e.stopPropagation();
+            const menu = document.getElementById(menuId);
+            // Close the other menu if open
+            if(menuId === 'dropdown-menu') document.getElementById('subtopic-dropdown').classList.remove('active');
+            if(menuId === 'subtopic-dropdown') document.getElementById('dropdown-menu').classList.remove('active');
+            
+            menu.classList.toggle('active');
+        }
+        
+        document.addEventListener('click', function(e) {
+            const menu1 = document.getElementById('dropdown-menu');
+            const menu2 = document.getElementById('subtopic-dropdown');
+            if (menu1.classList.contains('active') && !e.target.closest('#global-menu-btn')) menu1.classList.remove('active');
+            if (menu2.classList.contains('active') && !e.target.closest('#subtopic-menu-btn')) menu2.classList.remove('active');
+        });
+
+        function toggleTheme() {
+            isDarkMode = !isDarkMode;
+            document.body.classList.toggle('dark-mode');
+            document.getElementById('theme-text').innerText = isDarkMode ? "Light Mode" : "Dark Mode";
+        }
+
+        function exitSubtopic() {
+            alert("Exiting Subtopic... (Stand-alone mode)");
+        }
+
+        function getNextIndex() {
+            let currentSubtopicData = subtopicsData[currentSubtopicIndex];
+            let maxLen = currentSubtopicData.lessons.length - 1;
+            if(currentLessonIndex < maxLen) return currentLessonIndex + 1;
+            return maxLen;
+        }
+
+        function getPrevIndex() {
+            if(currentLessonIndex === 0) return 0;
+            return currentLessonIndex - 1;
+        }
+
+        function initTimer() {
+            let currentSubtopicData = subtopicsData[currentSubtopicIndex];
+            let sentences = currentSubtopicData.lessons[currentLessonIndex].sentences;
+            let totalSeconds = 0;
+            const rate = 0.95;
+            const baseWPM = 140;
+            const typeSpeedSec = 0.035;
+            const gapSec = 0.3;
+
+            sentences.forEach(raw => {
+                let speechText = getSpeechText(raw);
+                let words = speechText.split(/\s+/).filter(w => w.length > 0).length;
+                let speechTime = (words / (baseWPM * rate)) * 60;
+                let typingTime = raw.length * typeSpeedSec;
+                totalSeconds += Math.max(speechTime, typingTime) + gapSec;
+            });
+            
+            totalSeconds = Math.max(totalSeconds - gapSec, 1);
+            estimatedTotalSeconds = Math.ceil(totalSeconds);
+            currentTimerSeconds = estimatedTotalSeconds;
+            
+            updateTimerUI();
+        }
+
+        function startTimer() {
+            if (readTimerInterval) clearInterval(readTimerInterval);
+            let timerEl = document.getElementById('academic-timer');
+            if (timerEl) timerEl.classList.add('active');
+            readTimerInterval = setInterval(() => {
+                if (currentTimerSeconds > 0) {
+                    currentTimerSeconds--;
+                    updateTimerUI();
+                }
+            }, 1000);
+        }
+
+        function pauseTimer() {
+            if (readTimerInterval) {
+                clearInterval(readTimerInterval);
+                readTimerInterval = null;
+            }
+            let timerEl = document.getElementById('academic-timer');
+            if (timerEl) timerEl.classList.remove('active');
+        }
+
+        function resetTimer() {
+            currentTimerSeconds = estimatedTotalSeconds;
+            updateTimerUI();
+            let timerEl = document.getElementById('academic-timer');
+            if (timerEl) timerEl.classList.remove('active');
+        }
+
+        function updateTimerUI() {
+            let remainingSeconds = currentTimerSeconds;
+            if (isNaN(remainingSeconds) || remainingSeconds < 0) remainingSeconds = 0;
+            
+            let minutes = Math.floor(remainingSeconds / 60);
+            let seconds = Math.floor(remainingSeconds % 60);
+            let display = String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+            
+            let timerDisplay = document.getElementById('timer-display');
+            if (timerDisplay) {
+                timerDisplay.textContent = display;
+            }
+        }
+
+        function jumpToLesson(index, skipDuster = false) {
+            document.getElementById('subtopic-dropdown').classList.remove('active');
+            let currentSubtopicData = subtopicsData[currentSubtopicIndex];
+            if(index >= currentSubtopicData.lessons.length) return;
+            currentLessonIndex = index;
+            
+            document.getElementById('st-subtitle-text').innerText = currentSubtopicData.lessonTitles[index];
+            document.getElementById('choice-box').style.display = 'none';
+            document.getElementById('subtopic-menu-btn').classList.remove('pulse-attention');
+            
+            if(document.getElementById('board-text')) {
+                 document.getElementById('board-text').classList.remove('reading-done');
+            }
+            
+            stopReadingFull();
+            initTimer(); 
+
+            if (skipDuster) {
+                document.getElementById('board-text').innerHTML = "";
+                currentSentenceIndex = 0;
+                resetPlayButton();
+            } else {
+                document.getElementById('board-text').innerHTML = "";
+                currentSentenceIndex = 0;
+                resetPlayButton();
+            }
+        }
+
+        function startFullReadPress(e) {
+            if(fullReadTimer) clearTimeout(fullReadTimer);
+            isLongPressFired = false;
+            fullReadTimer = setTimeout(() => {
+                isLongPressFired = true;
+                displayFullContentImmediate();
+            }, 2000);
+        }
+
+        function cancelFullReadPress(e) {
+            if(fullReadTimer) clearTimeout(fullReadTimer);
+        }
+
+        function setReadMode(mode) {
+            if(isLongPressFired && mode === 'full') {
+                isLongPressFired = false;
+                return; 
+            }
+            readMode = mode;
+            document.getElementById('mode-full').classList.remove('active');
+            document.getElementById('mode-sentence').classList.remove('active');
+            document.getElementById(`mode-${mode}`).classList.add('active');
+            stopReadingFull();
+        }
+
+        function displayFullContentImmediate() {
+            stopReadingFull();
+            pauseTimer();
+            resetTimer(); 
+
+            let currentSubtopicData = subtopicsData[currentSubtopicIndex];
+            let lesson = currentSubtopicData.lessons[currentLessonIndex];
+            let board = document.getElementById('board-text');
+            board.innerHTML = "";
+            
+            let fullHTML = "";
+            
+            for(let i=0; i<lesson.sentences.length; i++) {
+                let raw = lesson.sentences[i];
+                let isHeading = raw.startsWith("[H]");
+                let isSub = raw.startsWith("[SH]");
+                let isList = raw.startsWith("[L]");
+                
+                let tag = (isHeading || isSub || isList) ? 'div' : 'span';
+                let className = "";
+                if (isHeading) className = "lesson-heading";
+                else if (isSub) className = "lesson-subheading";
+                else if (isList) className = "list-item";
+                
+                let style = (isHeading && i > 0) ? 'margin-top: 30px;' : '';
+                let contentHTML = "";
+                
+                let textRaw = raw.replace(/^\[H\]\s*|^\[SH\]\s*|^\[L\]\s*/, "");
+                contentHTML = textRaw
+                    .replace(/Logic/gi, "<span class='hl-orange'>Logic</span>")
+                    .replace(/True/g, "<span class='hl-green'>True</span>")
+                    .replace(/False/g, "<span class='hl-blue'>False</span>")
+                    .replace(/Statement/gi, "<span class='hl-orange'>Statement</span>");
+                if (!isHeading && !isSub && !isList) {
+                    contentHTML = " " + contentHTML;
+                }
+                
+                fullHTML += `<${tag} class="${className}" style="${style}">${contentHTML}</${tag}>`;
+            }
+            
+            board.innerHTML = fullHTML;
+            if (window.MathJax && fullHTML.includes('\\(')) {
+                MathJax.typesetPromise([board]).then(()=>{}).catch((err) => console.log(err));
+            }
+            
+            currentSentenceIndex = lesson.sentences.length;
+            finishLessonBlock();
+        }
+
+        function getSpeechText(text) {
+            let stripped = text.replace(/\[H\]|\[SH\]|\[L\]/g, "");
+            stripped = stripped.replace(/<[^>]+>/gm, ''); 
+            stripped = stripped.replace(/[\u{1F300}-\u{1F9FF}\u{2700}-\u{27BF}\u{2600}-\u{26FF}\u{1FA00}-\u{1FAFF}]/gu, ''); 
+            
+            stripped = stripped.replace(/\\leftrightarrow/gi, ' Double Implication ');
+            stripped = stripped.replace(/\\Leftrightarrow/gi, ' Double Implication ');
+            stripped = stripped.replace(/↔/g, ' Double Implication ');
+
+            stripped = stripped.replace(/\\le/g, ' less than or equal to ');
+            stripped = stripped.replace(/\\ge/g, ' greater than or equal to ');
+            stripped = stripped.replace(/≤/g, ' less than or equal to ');
+            stripped = stripped.replace(/≥/g, ' greater than or equal to ');
+            stripped = stripped.replace(/</g, ' less than ');
+            stripped = stripped.replace(/>/g, ' greater than ');
+            stripped = stripped.replace(/\\equiv/g, ' equivalent to ');
+            stripped = stripped.replace(/≡/g, ' equivalent to ');
+            stripped = stripped.replace(/\\times/g, ' multiplied by ');
+            
+            stripped = stripped.replace(/\\wedge/g, ' And ');
+            stripped = stripped.replace(/\\vee/g, ' or ');
+            stripped = stripped.replace(/\\rightarrow/g, ' implies ');
+            stripped = stripped.replace(/\\sim/g, ' Negation ');
+
+            stripped = stripped.replace(/∧/g, ' And ');
+            stripped = stripped.replace(/∨/g, ' or ');
+            stripped = stripped.replace(/→/g, ' implies ');
+            stripped = stripped.replace(/~/g, ' Negation ');
+
+            stripped = stripped.replace(/\\\(/g, '').replace(/\\\)/g, '');
+            
+            stripped = stripped.replace(/\bOR\b/g, ' or ');
+            stripped = stripped.replace(/≠/g, ' NOT EQUAL TO ');
+            stripped = stripped.replace(/\\neq/g, ' NOT EQUAL TO ');
+            stripped = stripped.replace(/-/g, ' minus ');
+            
+            stripped = stripped.replace(/\(/g, ' bracket start ');
+            stripped = stripped.replace(/\)/g, ' bracket close ');
+            stripped = stripped.replace(/\[/g, ' big bracket start ');
+            stripped = stripped.replace(/\]/g, ' big bracket close ');
+            return stripped;
+        }
+
+        // === REPLAY BUTTON LOGIC FIXED ===
+        function toggleReading() {
+            let currentSubtopicData = subtopicsData[currentSubtopicIndex];
+            
+            if (ttsState === 'playing') {
+                pauseReading();
+            } else if (ttsState === 'paused') {
+                resumeReading();
+            } else {
+                if(currentSentenceIndex >= currentSubtopicData.lessons[currentLessonIndex].sentences.length) {
+                    document.getElementById('board-text').innerHTML = ""; // Clear the board
+                    currentSentenceIndex = 0; // Reset index to start
+                    document.getElementById('board-text').classList.remove('reading-done');
+                    document.getElementById('choice-box').style.display = 'none';
+                    document.getElementById('subtopic-menu-btn').classList.remove('pulse-attention');
+                    resetTimer();
+                    startSentencePlayback(); // Trigger playback directly
+                    return; // Prevent fallthrough
+                }
+                startSentencePlayback();
+            }
+        }
+
+        function pauseReading() {
+            ttsState = 'paused';
+            clearInterval(typeInterval);
+            window.speechSynthesis.cancel(); 
+            pauseTimer();
+            
+            let btn = document.getElementById('btn-read-action');
+            btn.innerHTML = '<i class="fa-solid fa-play"></i> Resume';
+            btn.classList.add('btn-breathe');
+        }
+
+        function resumeReading() {
+            ttsState = 'playing';
+            let btn = document.getElementById('btn-read-action');
+            btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg> Pause';
+            btn.classList.remove('btn-breathe');
+            
+            let remainingRaw = currentRawText.substring(charIdx);
+            let speechText = getSpeechText(remainingRaw);
+            speechText = speechText.replace(/∼/g, ' Negation ').replace(/~/g, ' Negation ').replace(/∧/g, ' And ').replace(/∨/g, ' Or ').replace(/→/g, ' Implies ').replace(/↔/g, ' Double implies ').replace(/∀/g, ' For all ').replace(/∃/g, ' There exists ');
+
+            if (speechText.trim().length > 0) {
+                currentUtterance = new SpeechSynthesisUtterance(speechText);
+                currentUtterance.rate = 0.95; 
+                currentUtterance.pitch = 1.0;
+                currentUtterance.onend = () => { handleSentenceEnd(); };
+                window.speechSynthesis.speak(currentUtterance);
+            } else {
+                setTimeout(handleSentenceEnd, 100);
+            }
+
+            typeInterval = setInterval(typeWriterStep, typeSpeed);
+            startTimer();
+        }
+
+        function stopReadingFull() {
+            ttsState = 'stopped';
+            clearInterval(typeInterval);
+            window.speechSynthesis.cancel();
+            pauseTimer();
+            resetPlayButton();
+        }
+
+        function resetPlayButton() {
+            let btn = document.getElementById('btn-read-action');
+            btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Play';
+            btn.classList.remove('btn-breathe');
+        }
+
+        function startSentencePlayback() {
+            let currentSubtopicData = subtopicsData[currentSubtopicIndex];
+            
+            if(currentSentenceIndex >= currentSubtopicData.lessons[currentLessonIndex].sentences.length) {
+                finishLessonBlock();
+                return;
+            }
+
+            ttsState = 'playing';
+            let btn = document.getElementById('btn-read-action');
+            btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg> Pause';
+            btn.classList.remove('btn-breathe');
+
+            window.speechSynthesis.cancel(); 
+
+            let raw = currentSubtopicData.lessons[currentLessonIndex].sentences[currentSentenceIndex];
+            
+            let isHeading = raw.startsWith("[H]");
+            let isSub = raw.startsWith("[SH]");
+            let isList = raw.startsWith("[L]");
+
+            let board = document.getElementById('board-text');
+            currentSpan = document.createElement((isHeading || isSub || isList) ? 'div' : 'span');
+            
+            if (isHeading) {
+                currentSpan.className = 'lesson-heading';
+                if (currentSentenceIndex > 0) { currentSpan.style.marginTop = "30px"; }
+            } else if (isSub) {
+                currentSpan.className = 'lesson-subheading';
+            } else if (isList) {
+                currentSpan.className = 'list-item';
+            } else {
+                board.appendChild(document.createTextNode(" "));
+            }
+
+            currentRawText = raw.replace(/^\[H\]\s*|^\[SH\]\s*|^\[L\]\s*/, "");
+            currentStyledHTML = currentRawText
+                .replace(/Logic/gi, "<span class='hl-orange'>Logic</span>")
+                .replace(/True/g, "<span class='hl-green'>True</span>")
+                .replace(/False/g, "<span class='hl-blue'>False</span>")
+                .replace(/Statement/gi, "<span class='hl-orange'>Statement</span>");
+                
+            let speechText = getSpeechText(raw);
+            speechText = speechText.replace(/∼/g, ' Negation ').replace(/~/g, ' Negation ').replace(/∧/g, ' And ').replace(/∨/g, ' Or ').replace(/→/g, ' Implies ').replace(/↔/g, ' Double implies ').replace(/∀/g, ' For all ').replace(/∃/g, ' There exists ');
+            board.appendChild(currentSpan);
+
+            charIdx = 0;
+            typeInterval = setInterval(typeWriterStep, typeSpeed);
+            startTimer();
+
+            setTimeout(() => {
+                if (ttsState !== 'playing') return;
+                currentUtterance = new SpeechSynthesisUtterance(speechText);
+                currentUtterance.rate = 0.95; 
+                currentUtterance.pitch = 0.9;
+                currentUtterance.lang = 'en-IN';
+                // Force Indian English male voice
+                try {
+                    let voices = window.speechSynthesis.getVoices();
+                    let indianMale = voices.find(v => v.lang === 'en-IN' && /male|Ravi|Prabhat|Ajit/i.test(v.name)) 
+                                   || voices.find(v => v.lang === 'en-IN')
+                                   || voices.find(v => v.lang.toLowerCase().startsWith('en-in'));
+                    if (indianMale) { currentUtterance.voice = indianMale; }
+                } catch(e) {}
+                currentUtterance.onend = () => { handleSentenceEnd(); };
+                window.speechSynthesis.speak(currentUtterance);
+            }, 300); 
+        }
+
+        function handleSentenceEnd() {
+            let currentSubtopicData = subtopicsData[currentSubtopicIndex];
+            currentSentenceIndex++;
+            
+            if(readMode === 'full') {
+                if(ttsState === 'playing') {
+                    setTimeout(() => { if(ttsState === 'playing') startSentencePlayback(); }, 300);
+                }
+            } else {
+                ttsState = 'stopped';
+                let btn = document.getElementById('btn-read-action');
+                btn.innerHTML = '<i class="fa-solid fa-play"></i> Read Next';
+                btn.classList.add('btn-breathe');
+                pauseTimer();
+                if(currentSentenceIndex >= currentSubtopicData.lessons[currentLessonIndex].sentences.length) {
+                    finishLessonBlock();
+                }
+            }
+        }
+
+        function typeWriterStep() {
+            if (charIdx < currentRawText.length) {
+                currentSpan.innerText = currentRawText.substring(0, charIdx + 1); 
+                charIdx++;
+                document.getElementById('board-area').scrollTop = document.getElementById('board-area').scrollHeight;
+            } else {
+                clearInterval(typeInterval);
+                currentSpan.innerHTML = currentStyledHTML; 
+                
+                if (window.MathJax && currentStyledHTML.includes('\\(')) {
+                    MathJax.typesetPromise([currentSpan]).catch((err) => console.log(err));
+                }
+                
+                document.getElementById('board-area').scrollTop = document.getElementById('board-area').scrollHeight;
+            }
+        }
+
+        function renderDynamicNavChoices() {
+            let currentSubtopicData = subtopicsData[currentSubtopicIndex];
+            let box = document.getElementById('choice-box');
+            box.innerHTML = ''; 
+
+            let prevDisabled = (currentLessonIndex === 0) ? 'disabled' : '';
+            let btnPrev = `<button class="drop-btn nav-btn" style="flex:1; justify-content:center; background: linear-gradient(135deg, #FF416C, #FF4B2B);" onclick="jumpToLesson(${getPrevIndex()})" ${prevDisabled}> <i class="fa-solid fa-backward"></i> Previous</button>`;
+            
+            let btnNext = "";
+            if (currentLessonIndex === currentSubtopicData.lessons.length - 1) {
+                // Since there is only one subtopic loaded, disable Next at the very end
+                btnNext = `<button class="drop-btn nav-btn" style="flex:1; justify-content:center; background: var(--text-muted);" disabled>End of Subtopic <i class="fa-solid fa-check-double"></i></button>`;
+            } else {
+                btnNext = `<button class="drop-btn nav-btn" style="flex:1; justify-content:center; background: linear-gradient(135deg, #11998e, #38ef7d);" onclick="jumpToLesson(${getNextIndex()})">Next <i class="fa-solid fa-forward"></i></button>`;
+            }
+
+            let navGroup = `<div style="display:flex; gap:10px; width:100%; margin-top: 10px;">${btnPrev}${btnNext}</div>`;
+
+            box.innerHTML = navGroup;
+            box.style.display = 'flex';
+        }
+
+        function finishLessonBlock() {
+            stopReadingFull();
+            pauseTimer();
+            
+            currentTimerSeconds = 0; 
+            updateTimerUI();
+            
+            document.getElementById('btn-read-action').innerHTML = '<i class="fa-solid fa-rotate-left"></i> Replay';
+            document.getElementById('board-text').classList.add('reading-done');
+            document.getElementById('subtopic-menu-btn').classList.add('pulse-attention');
+
+            renderDynamicNavChoices();
+            
+            setTimeout(() => {
+                document.getElementById('board-area').scrollTop = document.getElementById('board-area').scrollHeight;
+            }, 100);
+        }
+    </script>
+
+<!-- === COPY TEXT FEATURE ADDED - does not modify previous code === -->
+<script id="copy-text-enabler">
+(function(){
+  // Inject CSS to re-enable text selection for all non-button elements
+  const style = document.createElement('style');
+  style.textContent = `
+    /* Allow copying text everywhere except buttons */
+    body, #app-container, .board-area, #board-text, .text-3d-card,
+    .lesson-heading, .lesson-subheading, .list-item,
+    .brand, .brand-big, .subtopic-title, .lesson-name,
+    p, span, div, h1, h2, h3 {
+      -webkit-user-select: text !important;
+      -moz-user-select: text !important;
+      -ms-user-select: text !important;
+      user-select: text !important;
+      -webkit-touch-callout: default !important;
+    }
+    /* Keep buttons non-selectable */
+    button, button *, .drop-btn, .drop-btn *, .nav-btn, .nav-btn *,
+    .subtopic-btn, .subtopic-btn *, .icon-circle, .icon-circle *,
+    .read-btn, .read-btn *, .controls, .controls * {
+      -webkit-user-select: none !important;
+      -moz-user-select: none !important;
+      -ms-user-select: none !important;
+      user-select: none !important;
+      -webkit-touch-callout: none !important;
+    }
+  `;
+  document.head.appendChild(style);
+
+  // When user touches any text (not a button), select it so copy menu appears
+  function isButton(el) {
+    return el.closest('button, .drop-btn, .nav-btn, .subtopic-btn, .icon-circle, .read-btn, .controls');
+  }
+
+  document.addEventListener('touchend', function(e) {
+    if (isButton(e.target)) return; // skip buttons
+    
+    const target = e.target.closest('#board-text, .lesson-heading, .lesson-subheading, .list-item, .text-3d-card, .brand, .brand-big, .subtopic-title, .lesson-name, p, span');
+    if (!target) return;
+    
+    // Select the text content to trigger native copy menu
+    try {
+      const range = document.createRange();
+      range.selectNodeContents(target);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch(err) {}
+  }, {passive: true});
+
+  // Also support mouse click for desktop testing
+  document.addEventListener('mouseup', function(e) {
+    if (isButton(e.target)) return;
+    const target = e.target.closest('#board-text, .lesson-heading, .lesson-subheading, .list-item, .text-3d-card');
+    if (!target) return;
+    // selection already handled by browser
+  });
+})();
+</script>
+</body>
+</html>
