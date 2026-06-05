@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- Playables SDK -->
+<script>// Playables SDK v1.0.0
+// Game lifecycle bridge: rAF-based game-ready detection + event communication
+(function() {
+  'use strict';
+
+  // Idempotency: skip if already initialized (e.g., server-side injection
+  // followed by client-side inject-javascript via the Bloks webview component).
+  if (window.playablesSDK) return;
+
+  var HANDLER_NAME = 'playablesGameEventHandler';
+  var ANDROID_BRIDGE_NAME = '_MetaPlayablesBridge';
+  var RAF_FRAME_THRESHOLD = 3;
+
+  var gameReadySent = false;
+  var firstInteractionSent = false;
+  var errorSent = false;
+  var frameCount = 0;
+  var originalRAF = window.requestAnimationFrame;
+
+  // --- Transport Layer ---
+
+  function hasIOSBridge() {
+    return !!(window.webkit &&
+              window.webkit.messageHandlers &&
+              window.webkit.messageHandlers[HANDLER_NAME]);
+  }
+
+  function hasAndroidBridge() {
+    return !!(window[ANDROID_BRIDGE_NAME] &&
+              typeof window[ANDROID_BRIDGE_NAME].postEvent === 'function');
+  }
+
+  function isInIframe() {
+    return !!(window.parent && window.parent !== window);
+  }
+
+  function sendEvent(eventName, payload) {
+    var message = {
+      type: eventName,
+      payload: payload || {},
+      timestamp: Date.now()
+    };
+
+    if (hasIOSBridge()) {
+      try {
+        window.webkit.messageHandlers[HANDLER_NAME].postMessage(message);
+      } catch (e) { /* ignore */ }
+      return;
+    }
+
+    if (hasAndroidBridge()) {
+    try {
+      var p = payload || {};
+      p.__secureToken = window.__fbAndroidBridgeAuthToken || '';
+      p.timestamp = message.timestamp;
+      window[ANDROID_BRIDGE_NAME].postEvent(
+        eventName,
+        JSON.stringify(p)
+      );
+    } catch (e) { /* ignore */ }
+    return;
+  }
+
+    if (isInIframe()) {
+      try {
+        window.parent.postMessage(message, '*');
+      } catch (e) { /* ignore */ }
+      return;
+    }
+  }
+
+  // --- rAF Game-Ready Detection ---
+
+  function onFrame() {
+    if (gameReadySent) return;
+
+    frameCount++;
+    if (frameCount >= RAF_FRAME_THRESHOLD) {
+      gameReadySent = true;
+      sendEvent('game_ready', {
+        frame_count: frameCount,
+        detected_at: Date.now()
+      });
+      return;
+    }
+
+    originalRAF.call(window, onFrame);
+  }
+
+  if (originalRAF) {
+    window.requestAnimationFrame = function(callback) {
+      if (!gameReadySent) {
+        return originalRAF.call(window, function(timestamp) {
+          frameCount++;
+          if (frameCount >= RAF_FRAME_THRESHOLD && !gameReadySent) {
+            gameReadySent = true;
+            sendEvent('game_ready', {
+              frame_count: frameCount,
+              detected_at: Date.now()
+            });
+          }
+          callback(timestamp);
+        });
+      }
+      return originalRAF.call(window, callback);
+    };
+  }
+
+  // --- First User Interaction Detection ---
+
+  function setupFirstInteractionDetection() {
+    var events = ['touchstart', 'mousedown', 'keydown'];
+
+    function onFirstInteraction() {
+      if (firstInteractionSent) return;
+      firstInteractionSent = true;
+      sendEvent('user_interaction_start', null);
+
+      for (var i = 0; i < events.length; i++) {
+        document.removeEventListener(events[i], onFirstInteraction, true);
+      }
+    }
+
+    for (var i = 0; i < events.length; i++) {
+      document.addEventListener(events[i], onFirstInteraction, true);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupFirstInteractionDetection);
+  } else {
+    setupFirstInteractionDetection();
+  }
+
+  // --- Auto Error Capture ---
+
+  window.addEventListener('error', function(event) {
+    if (errorSent) return;
+    errorSent = true;
+    sendEvent('error', {
+      message: event.message || 'Unknown error',
+      source: event.filename || '',
+      lineno: event.lineno || 0,
+      colno: event.colno || 0,
+      auto_captured: true
+    });
+  });
+
+  window.addEventListener('unhandledrejection', function(event) {
+    if (errorSent) return;
+    errorSent = true;
+    var reason = event.reason;
+    sendEvent('error', {
+      message: (reason instanceof Error) ? reason.message : String(reason),
+      type: 'unhandled_promise_rejection',
+      auto_captured: true
+    });
+  });
+
+  // --- Public API ---
+
+  window.playablesSDK = {
+    complete: function(score) {
+      sendEvent('game_ended', {
+        score: score,
+        completed: true
+      });
+    },
+
+    error: function(message) {
+      if (errorSent) return;
+      errorSent = true;
+      sendEvent('error', {
+        message: message || 'Unknown error',
+        auto_captured: false
+      });
+    },
+
+    sendEvent: function(eventName, payload) {
+      if (!eventName || typeof eventName !== 'string') return;
+      sendEvent(eventName, payload);
+    }
+  };
+
+  // Kick off rAF detection in case no game code calls rAF immediately
+  if (originalRAF) {
+    originalRAF.call(window, onFrame);
+  }
+})();</script>
+<!-- PLAYABLE_TOUCH_PATCH_V1 --><script>
+(function() {
+  if (window.__playableTouchPatchInstalled) return;
+  window.__playableTouchPatchInstalled = true;
+  var origAdd = EventTarget.prototype.addEventListener;
+  var blockedTypes = { touchstart: 1, touchmove: 1, wheel: 1 };
+  EventTarget.prototype.addEventListener = function(type, listener, options) {
+    if (blockedTypes[type]) {
+      if (options === undefined || options === null) {
+        options = { passive: true };
+      } else if (typeof options === 'boolean') {
+        options = { capture: options, passive: true };
+      } else {
+        options = Object.assign({}, options, { passive: true });
+      }
+    }
+    return origAdd.call(this, type, listener, options);
+  };
+})();
+</script><script>window.Intl=window.Intl||{};Intl.t=function(s){return(Intl._locale&&Intl._locale[s])||s;};</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Exercise 1.5 - Question 1(i)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    :root {
+        --bg-primary: #f8fafc;
+        --bg-secondary: #ffffff;
+        --bg-card: #ffffff;
+        --text-primary: #0f172a;
+        --text-secondary: #475569;
+        --text-muted: #64748b;
+        --border: #e2e8f0;
+        --accent: #6366f1;
+        --accent-hover: #4f46e5;
+        --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --gradient-2: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        --gradient-exit: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+        --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+        --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+        --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+    }
+
+    [data-theme="dark"] {
+        --bg-primary: #0f172a;
+        --bg-secondary: #1e293b;
+        --bg-card: #1e293b;
+        --text-primary: #f1f5f9;
+        --text-secondary: #cbd5e1;
+        --text-muted: #94a3b8;
+        --border: #334155;
+        --accent: #818cf8;
+        --accent-hover: #6366f1;
+        --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --gradient-2: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+        --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4);
+        --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5);
+        --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.6);
+    }
+
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: 'Inter', sans-serif;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        transition: background 0.3s ease, color 0.3s ease;
+        min-height: 100vh;
+    }
+
+    .glass-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        box-shadow: var(--shadow-lg);
+        transition: all 0.3s ease;
+    }
+
+    .glass-card:hover {
+        box-shadow: var(--shadow-xl);
+        transform: translateY(-2px);
+    }
+
+    .btn-gradient {
+        background: var(--gradient-1);
+        color: white;
+        border: none;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .btn-gradient::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        transition: left 0.5s ease;
+    }
+
+    .btn-gradient:hover::before {
+        left: 100%;
+    }
+
+    .btn-gradient:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px -5px rgba(102, 126, 234, 0.5);
+    }
+
+    .btn-exit {
+        background: var(--gradient-exit);
+        color: white;
+        border: none;
+        transition: all 0.3s ease;
+    }
+
+    .btn-exit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px -5px rgba(255, 107, 107, 0.5);
+    }
+
+    .btn-nav {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        color: var(--text-primary);
+        transition: all 0.3s ease;
+    }
+
+    .btn-nav:hover {
+        background: var(--accent);
+        color: white;
+        border-color: var(--accent);
+        transform: translateY(-2px);
+    }
+
+    .btn-nav.active {
+        background: var(--accent);
+        color: white;
+        border-color: var(--accent);
+        box-shadow: 0 4px 12px -2px rgba(99, 102, 241, 0.4);
+    }
+
+    .nav-button {
+        padding: 0.625rem 1.25rem;
+        border-radius: 10px;
+        font-weight: 500;
+        font-size: 0.875rem;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: all 0.3s ease;
+    }
+
+    .tts-button {
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-weight: 500;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .tts-button:active {
+        transform: scale(0.95);
+    }
+
+    .heading-gradient {
+        background: var(--gradient-1);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .circuit-img {
+        border: 2px solid var(--border);
+        border-radius: 12px;
+        box-shadow: var(--shadow-md);
+        transition: all 0.3s ease;
+    }
+
+    .circuit-img:hover {
+        box-shadow: var(--shadow-xl);
+        transform: scale(1.02);
+    }
+
+    .content-section {
+        animation: fadeIn 0.5s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .math-content {
+        line-height: 1.8;
+        color: var(--text-secondary);
+    }
+
+    .math-content strong {
+        color: var(--text-primary);
+        font-weight: 600;
+    }
+
+    @media (max-width: 768px) {
+        .nav-button {
+            padding: 0.5rem 0.875rem;
+            font-size: 0.75rem;
+        }
+    }
+
+    /* Playables SDK Touch Patch */
+    * {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    input, textarea {
+        -webkit-user-select: text;
+        user-select: text;
+    }
+</style>
+</head>
+<body data-theme="light">
+    <!-- Playables SDK Block -->
+    <script>
+        // Playables SDK Initialization Stub
+        window.PlayablesSDK = window.PlayablesSDK || {
+            ready: false,
+            init: function() {
+                this.ready = true;
+                console.log('Playables SDK initialized');
+            },
+            exit: function() {
+                console.log('Playables SDK: Exit requested');
+                if (window.parent !== window) {
+                    window.parent.postMessage({ type: 'EXIT_PLAYABLE' }, '*');
+                }
+            }
+        };
+        
+        // Touch Event Patch for iOS/Android
+        document.addEventListener('touchstart', function(e) {
+            if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'A' && e.target.tagName !== 'INPUT') {
+                // Allow default for interactive elements
+            }
+        }, { passive: true });
+    </script>
+
+    <div class="min-h-screen p-4 md:p-6 lg:p-8">
+        <!-- Header Section -->
+        <header class="max-w-7xl mx-auto mb-6">
+            <div class="glass-card p-4 md:p-6">
+                <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                    <div class="flex-1">
+                        <h1 class="text-3xl md:text-4xl font-bold heading-gradient mb-2">Physics Solutions</h1>
+                        <p class="text-sm md:text-base text-muted">Exercise 1.5</p>
+                    </div>
+                    <button id="exitBtn" class="btn-exit nav-button flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Exit
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation Buttons -->
+        <nav class="max-w-7xl mx-auto mb-6">
+            <div class="glass-card p-4">
+                <div class="flex flex-wrap gap-2 md:gap-3">
+                    <button id="darkModeBtn" class="btn-nav nav-button flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                        </svg>
+                        DARK MODE SWITCH
+                    </button>
+                    <button class="btn-nav nav-button question-btn active" data-question="q1">QUESTION 1</button>
+                    <button class="btn-nav nav-button question-btn" data-question="q3a">QUESTION 3</button>
+                    <button class="btn-nav nav-button question-btn" data-question="q3b">QUESTION 3</button>
+                    <button class="btn-nav nav-button question-btn" data-question="q4">QUESTION 4</button>
+                    <button class="btn-nav nav-button question-btn" data-question="q5">QUESTION 5</button>
+                    <button class="btn-nav nav-button question-btn" data-question="summary">SUMMARY</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- TTS Controls -->
+        <div class="max-w-7xl mx-auto mb-6">
+            <div class="glass-card p-4">
+                <div class="flex flex-wrap items-center gap-3">
+                    <span class="text-sm font-medium text-secondary">Text-to-Speech:</span>
+                    <button id="playBtn" class="btn-gradient tts-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Play
+                    </button>
+                    <button id="pauseBtn" class="btn-gradient tts-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Pause
+                    </button>
+                    <button id="replayBtn" class="btn-gradient tts-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Replay
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto">
+            <div class="glass-card p-6 md:p-8 lg:p-10">
+                <div id="contentArea" class="content-section">
+                    <!-- Question 1(i) Content -->
+                    <div id="q1-content" class="question-content">
+                        <h2 class="text-2xl md:text-3xl font-bold mb-6 heading-gradient">Question 1 (i)</h2>
+                        
+                        <div class="mb-8 flex justify-center">
+                            <img src="https://i.ibb.co/whvGmcVH/signal-2026-06-05-13-25-03-816.jpg" 
+                                 alt="Circuit Diagram for Question 1(i)" 
+                                 class="circuit-img w-full max-w-2xl h-auto">
+                        </div>
+
+                        <div class="math-content space-y-4 text-base md:text-lg" id="ttsContent">
+                            <p><strong>Solution:</strong></p>
+                            <p>From the given circuit diagram, we have two resistors connected in series: R₁ = 4Ω and R₂ = 6Ω, connected to a 10V battery.</p>
+                            
+                            <p><strong>Step 1: Calculate the total resistance</strong></p>
+                            <p>For resistors in series, the total resistance R<sub>total</sub> = R₁ + R₂</p>
+                            <p>R<sub>total</sub> = 4Ω + 6Ω = 10Ω</p>
+                            
+                            <p><strong>Step 2: Calculate the total current</strong></p>
+                            <p>Using Ohm's Law: V = I × R, therefore I = V / R</p>
+                            <p>I = 10V / 10Ω = 1A</p>
+                            
+                            <p><strong>Step 3: Calculate voltage drop across each resistor</strong></p>
+                            <p>For R₁ = 4Ω: V₁ = I × R₁ = 1A × 4Ω = 4V</p>
+                            <p>For R₂ = 6Ω: V₂ = I × R₂ = 1A × 6Ω = 6V</p>
+                            
+                            <p><strong>Verification:</strong> V₁ + V₂ = 4V + 6V = 10V, which equals the battery voltage.</p>
+                            
+                            <p><strong>Answer:</strong> The total current in the circuit is 1A, with 4V across the 4Ω resistor and 6V across the 6Ω resistor.</p>
+                        </div>
+                    </div>
+
+                    <!-- Placeholder for Q3a -->
+                    <div id="q3a-content" class="question-content hidden">
+                        <h2 class="text-2xl md:text-3xl font-bold mb-6 heading-gradient">Question 3</h2>
+                        <p class="text-secondary">Content for Question 3 will be added here.</p>
+                    </div>
+
+                    <!-- Placeholder for Q3b -->
+                    <div id="q3b-content" class="question-content hidden">
+                        <h2 class="text-2xl md:text-3xl font-bold mb-6 heading-gradient">Question 3</h2>
+                        <p class="text-secondary">Content for Question 3 (duplicate) will be added here.</p>
+                    </div>
+
+                    <!-- Placeholder for Q4 -->
+                    <div id="q4-content" class="question-content hidden">
+                        <h2 class="text-2xl md:text-3xl font-bold mb-6 heading-gradient">Question 4</h2>
+                        <p class="text-secondary">Content for Question 4 will be added here.</p>
+                    </div>
+
+                    <!-- Placeholder for Q5 -->
+                    <div id="q5-content" class="question-content hidden">
+                        <h2 class="text-2xl md:text-3xl font-bold mb-6 heading-gradient">Question 5</h2>
+                        <p class="text-secondary">Content for Question 5 will be added here.</p>
+                    </div>
+
+                    <!-- Summary Page -->
+                    <div id="summary-content" class="question-content hidden">
+                        <h2 class="text-2xl md:text-3xl font-bold mb-6 heading-gradient">Summary</h2>
+                        <div class="space-y-4 text-base md:text-lg text-secondary">
+                            <p><strong>Exercise 1.5 Summary</strong></p>
+                            <p>This exercise covers fundamental concepts of electric circuits including series connections, Ohm's law, and voltage division.</p>
+                            <p class="text-muted">Select individual questions from the navigation to view detailed solutions.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Initialize Playables SDK
+        PlayablesSDK.init();
+
+        // Dark Mode Toggle with Persistence
+        const darkModeBtn = document.getElementById('darkModeBtn');
+        const body = document.body;
+        
+        // Load saved theme
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        body.setAttribute('data-theme', savedTheme);
+        updateDarkModeIcon(savedTheme);
+
+        darkModeBtn.addEventListener('click', () => {
+            const currentTheme = body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateDarkModeIcon(newTheme);
+        });
+
+        function updateDarkModeIcon(theme) {
+            const icon = darkModeBtn.querySelector('svg');
+            if (theme === 'dark') {
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />';
+            } else {
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />';
+            }
+        }
+
+        // Exit Button Logic
+        const exitBtn = document.getElementById('exitBtn');
+        exitBtn.addEventListener('click', () => {
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            }
+            PlayablesSDK.exit();
+        });
+
+        // Question Navigation with Button Highlight
+        const questionBtns = document.querySelectorAll('.question-btn');
+        const questionContents = document.querySelectorAll('.question-content');
+
+        questionBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const questionId = btn.getAttribute('data-question');
+                
+                // Stop TTS when switching questions
+                if (utterance && speechSynthesis.speaking) {
+                    speechSynthesis.cancel();
+                }
+                
+                // Update active button
+                questionBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                // Show corresponding content
+                questionContents.forEach(content => {
+                    content.classList.add('hidden');
+                });
+                document.getElementById(`${questionId}-content`).classList.remove('hidden');
+                
+                // Scroll to top smoothly
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        });
+
+        // TTS Engine with Web Speech API
+        const playBtn = document.getElementById('playBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const replayBtn = document.getElementById('replayBtn');
+        let utterance = null;
+        let isPaused = false;
+        let currentText = '';
+
+        function getTextContent() {
+            const activeContent = document.querySelector('.question-content:not(.hidden) #ttsContent');
+            if (activeContent) {
+                return activeContent.innerText || activeContent.textContent;
+            }
+            return '';
+        }
+
+        function speakText(text) {
+            if (!('speechSynthesis' in window)) {
+                alert('Text-to-Speech is not supported in your browser.');
+                return;
+            }
+
+            speechSynthesis.cancel();
+            utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 0.95;
+            utterance.pitch = 1;
+            utterance.volume = 1;
+            
+            utterance.onend = () => {
+                isPaused = false;
+                currentText = '';
+            };
+            
+            utterance.onerror = (e) => {
+                console.error('TTS Error:', e);
+                isPaused = false;
+            };
+            
+            speechSynthesis.speak(utterance);
+            isPaused = false;
+        }
+
+        playBtn.addEventListener('click', () => {
+            if (isPaused && speechSynthesis.paused) {
+                speechSynthesis.resume();
+                isPaused = false;
+            } else {
+                if (!speechSynthesis.speaking) {
+                    currentText = getTextContent();
+                    speakText(currentText);
+                }
+            }
+        });
+
+        pauseBtn.addEventListener('click', () => {
+            if (speechSynthesis.speaking && !speechSynthesis.paused) {
+                speechSynthesis.pause();
+                isPaused = true;
+            }
+        });
+
+        replayBtn.addEventListener('click', () => {
+            speechSynthesis.cancel();
+            setTimeout(() => {
+                currentText = getTextContent();
+                speakText(currentText);
+            }, 100);
+        });
+
+        // Back Button Logic - Handle browser back button
+        window.addEventListener('pagehide', () => {
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            }
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            }
+        });
+    </script>
+<script>(function(){document.addEventListener("click",function(e){var a=e.target.closest("[data-product-id]");if(!a)return;e.preventDefault();var pid=a.getAttribute("data-product-id");if(pid)parent.postMessage({type:"ecto-artifact-link-click",productId:pid},"*")})})();</script>
+</body>
+</html>
