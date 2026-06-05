@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- Playables SDK -->
+<script>// Playables SDK v1.0.0
+// Game lifecycle bridge: rAF-based game-ready detection + event communication
+(function() {
+  'use strict';
+
+  // Idempotency: skip if already initialized (e.g., server-side injection
+  // followed by client-side inject-javascript via the Bloks webview component).
+  if (window.playablesSDK) return;
+
+  var HANDLER_NAME = 'playablesGameEventHandler';
+  var ANDROID_BRIDGE_NAME = '_MetaPlayablesBridge';
+  var RAF_FRAME_THRESHOLD = 3;
+
+  var gameReadySent = false;
+  var firstInteractionSent = false;
+  var errorSent = false;
+  var frameCount = 0;
+  var originalRAF = window.requestAnimationFrame;
+
+  // --- Transport Layer ---
+
+  function hasIOSBridge() {
+    return !!(window.webkit &&
+              window.webkit.messageHandlers &&
+              window.webkit.messageHandlers[HANDLER_NAME]);
+  }
+
+  function hasAndroidBridge() {
+    return !!(window[ANDROID_BRIDGE_NAME] &&
+              typeof window[ANDROID_BRIDGE_NAME].postEvent === 'function');
+  }
+
+  function isInIframe() {
+    return !!(window.parent && window.parent !== window);
+  }
+
+  function sendEvent(eventName, payload) {
+    var message = {
+      type: eventName,
+      payload: payload || {},
+      timestamp: Date.now()
+    };
+
+    if (hasIOSBridge()) {
+      try {
+        window.webkit.messageHandlers[HANDLER_NAME].postMessage(message);
+      } catch (e) { /* ignore */ }
+      return;
+    }
+
+    if (hasAndroidBridge()) {
+    try {
+      var p = payload || {};
+      p.__secureToken = window.__fbAndroidBridgeAuthToken || '';
+      p.timestamp = message.timestamp;
+      window[ANDROID_BRIDGE_NAME].postEvent(
+        eventName,
+        JSON.stringify(p)
+      );
+    } catch (e) { /* ignore */ }
+    return;
+  }
+
+    if (isInIframe()) {
+      try {
+        window.parent.postMessage(message, '*');
+      } catch (e) { /* ignore */ }
+      return;
+    }
+  }
+
+  // --- rAF Game-Ready Detection ---
+
+  function onFrame() {
+    if (gameReadySent) return;
+
+    frameCount++;
+    if (frameCount >= RAF_FRAME_THRESHOLD) {
+      gameReadySent = true;
+      sendEvent('game_ready', {
+        frame_count: frameCount,
+        detected_at: Date.now()
+      });
+      return;
+    }
+
+    originalRAF.call(window, onFrame);
+  }
+
+  if (originalRAF) {
+    window.requestAnimationFrame = function(callback) {
+      if (!gameReadySent) {
+        return originalRAF.call(window, function(timestamp) {
+          frameCount++;
+          if (frameCount >= RAF_FRAME_THRESHOLD && !gameReadySent) {
+            gameReadySent = true;
+            sendEvent('game_ready', {
+              frame_count: frameCount,
+              detected_at: Date.now()
+            });
+          }
+          callback(timestamp);
+        });
+      }
+      return originalRAF.call(window, callback);
+    };
+  }
+
+  // --- First User Interaction Detection ---
+
+  function setupFirstInteractionDetection() {
+    var events = ['touchstart', 'mousedown', 'keydown'];
+
+    function onFirstInteraction() {
+      if (firstInteractionSent) return;
+      firstInteractionSent = true;
+      sendEvent('user_interaction_start', null);
+
+      for (var i = 0; i < events.length; i++) {
+        document.removeEventListener(events[i], onFirstInteraction, true);
+      }
+    }
+
+    for (var i = 0; i < events.length; i++) {
+      document.addEventListener(events[i], onFirstInteraction, true);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupFirstInteractionDetection);
+  } else {
+    setupFirstInteractionDetection();
+  }
+
+  // --- Auto Error Capture ---
+
+  window.addEventListener('error', function(event) {
+    if (errorSent) return;
+    errorSent = true;
+    sendEvent('error', {
+      message: event.message || 'Unknown error',
+      source: event.filename || '',
+      lineno: event.lineno || 0,
+      colno: event.colno || 0,
+      auto_captured: true
+    });
+  });
+
+  window.addEventListener('unhandledrejection', function(event) {
+    if (errorSent) return;
+    errorSent = true;
+    var reason = event.reason;
+    sendEvent('error', {
+      message: (reason instanceof Error) ? reason.message : String(reason),
+      type: 'unhandled_promise_rejection',
+      auto_captured: true
+    });
+  });
+
+  // --- Public API ---
+
+  window.playablesSDK = {
+    complete: function(score) {
+      sendEvent('game_ended', {
+        score: score,
+        completed: true
+      });
+    },
+
+    error: function(message) {
+      if (errorSent) return;
+      errorSent = true;
+      sendEvent('error', {
+        message: message || 'Unknown error',
+        auto_captured: false
+      });
+    },
+
+    sendEvent: function(eventName, payload) {
+      if (!eventName || typeof eventName !== 'string') return;
+      sendEvent(eventName, payload);
+    }
+  };
+
+  // Kick off rAF detection in case no game code calls rAF immediately
+  if (originalRAF) {
+    originalRAF.call(window, onFrame);
+  }
+})();</script>
+<!-- PLAYABLE_TOUCH_PATCH_V1 --><script>
+(function() {
+  if (window.__playableTouchPatchInstalled) return;
+  window.__playableTouchPatchInstalled = true;
+  var origAdd = EventTarget.prototype.addEventListener;
+  var blockedTypes = { touchstart: 1, touchmove: 1, wheel: 1 };
+  EventTarget.prototype.addEventListener = function(type, listener, options) {
+    if (blockedTypes[type]) {
+      if (options === undefined || options === null) {
+        options = { passive: true };
+      } else if (typeof options === 'boolean') {
+        options = { capture: options, passive: true };
+      } else {
+        options = Object.assign({}, options, { passive: true });
+      }
+    }
+    return origAdd.call(this, type, listener, options);
+  };
+})();
+</script><script>window.Intl=window.Intl||{};Intl.t=function(s){return(Intl._locale&&Intl._locale[s])||s;};</script>
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1a1a1a">
+<style>
+:root {
+  color-scheme: light dark;
+  --bg-primary: #ffffff;
+  --text-primary: #1a1a1a;
+  --card-bg: #f8f9fa;
+  --button-bg: #ffffff;
+  --button-text: #2c3e50;
+  --button-border: #2c3e50;
+  --orange: #ff8c00;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-primary: #1a1a1a;
+    --text-primary: #e0e0e0;
+    --card-bg: #2d3748;
+    --button-bg: #4a5568;
+    --button-text: #ffffff;
+    --button-border: #718096;
+  }
+}
+
+/* Force override Chrome's user agent stylesheet */
+html, body {
+  background-color: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+.fullscreen-btn, button[class*="FULL"], button:contains("VIEW IN FULL SCREEN") {
+  background-color: var(--button-bg) !important;
+  color: var(--button-text) !important;
+  border: 2px solid var(--button-border) !important;
+}
+
+/* Orange buttons from screenshot */
+button[class*="PLAY"], button[class*="PAUSE"], button[class*="REPLAY"] {
+  background: linear-gradient(135deg, #ff9a3c, #ff6a00) !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
+button[class*="FULL"][class*="SOLUTION"] {
+  background-color: var(--card-bg) !important;
+  color: var(--orange) !important;
+  border: 2px solid var(--orange) !important;
+}
+</style>
+
+
+<script>
+// Chrome June 2026 TTS: Force Indian English Male - No fallback to US Female
+let selectedIndianVoice = null;
+let voiceLoadAttempts = 0;
+const MAX_VOICE_ATTEMPTS = 20;
+
+function findIndianMaleVoice() {
+  const voices = window.speechSynthesis.getVoices();
+  console.log('Available voices:', voices.map(v => `${v.name} - ${v.lang}`));
+  
+  // Priority 1: Exact en-IN male
+  let voice = voices.find(v => 
+    (v.lang === 'en-IN' || v.lang === 'en_IN') && 
+    (v.name.toLowerCase().includes('male') || 
+     v.name.toLowerCase().includes('ravi') ||
+     v.name.toLowerCase().includes('india') && !v.name.toLowerCase().includes('female') && !v.name.toLowerCase().includes('aditi'))
+  );
+  
+  // Priority 2: Any en-IN voice if male not found
+  if (!voice) {
+    voice = voices.find(v => v.lang === 'en-IN' || v.lang === 'en_IN');
+  }
+  
+  // Priority 3: Google Indian English - Chrome sometimes labels it en-GB
+  if (!voice) {
+    voice = voices.find(v => 
+      v.name.includes('Google') && 
+      v.name.toLowerCase().includes('india')
+    );
+  }
+  
+  selectedIndianVoice = voice;
+  
+  if (voice) {
+    console.log('FORCED Indian Voice:', voice.name, voice.lang);
+  } else {
+    console.warn('No Indian voice found. User must install from Chrome Settings > Languages > Text-to-speech');
+  }
+  
+  return voice;
+}
+
+// Chrome loads voices async + sometimes needs multiple tries
+function loadVoicesRetry() {
+  voiceLoadAttempts++;
+  const voice = findIndianMaleVoice();
+  
+  if (!voice && voiceLoadAttempts < MAX_VOICE_ATTEMPTS) {
+    setTimeout(loadVoicesRetry, 200); // Retry every 200ms for 4 seconds
+  }
+}
+
+if (speechSynthesis.onvoiceschanged !== undefined) {
+  speechSynthesis.onvoiceschanged = loadVoicesRetry;
+}
+// Immediate attempt
+loadVoicesRetry();
+
+function speakTextStrictIndian(text) {
+  // Cancel everything
+  window.speechSynthesis.cancel();
+  
+  // Wait for voices if not loaded
+  if (!selectedIndianVoice && voiceLoadAttempts < MAX_VOICE_ATTEMPTS) {
+    setTimeout(() => speakTextStrictIndian(text), 250);
+    return;
+  }
+  
+  const utterance = new SpeechSynthesisUtterance(text);
+  
+  // HARD REQUIREMENTS for Chrome to use Indian voice
+  utterance.lang = 'en-IN'; // Must be exact
+  utterance.rate = 0.9; // Indians voices sound better slightly slower
+  utterance.pitch = 1.0;
+  utterance.volume = 1.0;
+  
+  if (selectedIndianVoice) {
+    utterance.voice = selectedIndianVoice;
+  } else {
+    // REFUSE to speak with US voice - show error instead
+    alert('Indian English voice not installed. Go to Chrome Settings > Accessibility > Text-to-speech > Install "English (India)" voice.');
+    return;
+  }
+  
+  // Verify voice actually used - Chrome bug where it ignores .voice
+  utterance.onstart = (event) => {
+    // Check if wrong voice is being used
+    if (event.utterance.voice && event.utterance.voice.lang !== 'en-IN') {
+      window.speechSynthesis.cancel();
+      console.error('Chrome ignored en-IN voice request. Using:', event.utterance.voice.lang);
+      alert('Chrome is blocking Indian voice. Please set "English (India)" as default in Android Settings > Accessibility > Text-to-speech output');
+    }
+  };
+  
+  // Chrome Android bug: speech stops after 15s. Keep alive.
+  let resumeTimer = setInterval(() => {
+    if (speechSynthesis.speaking) {
+      speechSynthesis.pause();
+      speechSynthesis.resume();
+    } else {
+      clearInterval(resumeTimer);
+    }
+  }, 14000);
+  
+  utterance.onerror = (e) => {
+    clearInterval(resumeTimer);
+    console.error('TTS Error:', e);
+  };
+  
+  utterance.onend = () => clearInterval(resumeTimer);
+  
+  window.speechSynthesis.speak(utterance);
+}
+
+// Override all PLAY buttons
+document.addEventListener('DOMContentLoaded', function() {
+  const buttons = document.querySelectorAll('button');
+  
+  buttons.forEach(btn => {
+    const text = btn.textContent.trim().toUpperCase();
+    
+    if (text.includes('PLAY')) {
+      btn.onclick = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const solutionEl = document.querySelector('[class*="solution"], [id*="solution"], .Solution, #Solution');
+        const textToSpeak = solutionEl ? solutionEl.innerText : 'Step 1: Assigning variables to the switches. Let p: The switch S1 is closed.';
+        speakTextStrictIndian(textToSpeak);
+      };
+    }
+    
+    if (text.includes('PAUSE')) {
+      btn.onclick = () => window.speechSynthesis.pause();
+    }
+    
+    if (text.includes('REPLAY')) {
+      btn.onclick = () => {
+        window.speechSynthesis.cancel();
+        setTimeout(() => {
+          const playBtn = Array.from(buttons).find(b => b.textContent.includes('PLAY'));
+          if (playBtn) playBtn.click();
+        }, 100);
+      };
+    }
+  });
+});
+</script>
+</body>
+</html>
