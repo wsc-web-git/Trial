@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- Playables SDK -->
+<script>// Playables SDK v1.0.0
+// Game lifecycle bridge: rAF-based game-ready detection + event communication
+(function() {
+  'use strict';
+
+  // Idempotency: skip if already initialized (e.g., server-side injection
+  // followed by client-side inject-javascript via the Bloks webview component).
+  if (window.playablesSDK) return;
+
+  var HANDLER_NAME = 'playablesGameEventHandler';
+  var ANDROID_BRIDGE_NAME = '_MetaPlayablesBridge';
+  var RAF_FRAME_THRESHOLD = 3;
+
+  var gameReadySent = false;
+  var firstInteractionSent = false;
+  var errorSent = false;
+  var frameCount = 0;
+  var originalRAF = window.requestAnimationFrame;
+
+  // --- Transport Layer ---
+
+  function hasIOSBridge() {
+    return !!(window.webkit &&
+              window.webkit.messageHandlers &&
+              window.webkit.messageHandlers[HANDLER_NAME]);
+  }
+
+  function hasAndroidBridge() {
+    return !!(window[ANDROID_BRIDGE_NAME] &&
+              typeof window[ANDROID_BRIDGE_NAME].postEvent === 'function');
+  }
+
+  function isInIframe() {
+    return !!(window.parent && window.parent !== window);
+  }
+
+  function sendEvent(eventName, payload) {
+    var message = {
+      type: eventName,
+      payload: payload || {},
+      timestamp: Date.now()
+    };
+
+    if (hasIOSBridge()) {
+      try {
+        window.webkit.messageHandlers[HANDLER_NAME].postMessage(message);
+      } catch (e) { /* ignore */ }
+      return;
+    }
+
+    if (hasAndroidBridge()) {
+    try {
+      var p = payload || {};
+      p.__secureToken = window.__fbAndroidBridgeAuthToken || '';
+      p.timestamp = message.timestamp;
+      window[ANDROID_BRIDGE_NAME].postEvent(
+        eventName,
+        JSON.stringify(p)
+      );
+    } catch (e) { /* ignore */ }
+    return;
+  }
+
+    if (isInIframe()) {
+      try {
+        window.parent.postMessage(message, '*');
+      } catch (e) { /* ignore */ }
+      return;
+    }
+  }
+
+  // --- rAF Game-Ready Detection ---
+
+  function onFrame() {
+    if (gameReadySent) return;
+
+    frameCount++;
+    if (frameCount >= RAF_FRAME_THRESHOLD) {
+      gameReadySent = true;
+      sendEvent('game_ready', {
+        frame_count: frameCount,
+        detected_at: Date.now()
+      });
+      return;
+    }
+
+    originalRAF.call(window, onFrame);
+  }
+
+  if (originalRAF) {
+    window.requestAnimationFrame = function(callback) {
+      if (!gameReadySent) {
+        return originalRAF.call(window, function(timestamp) {
+          frameCount++;
+          if (frameCount >= RAF_FRAME_THRESHOLD && !gameReadySent) {
+            gameReadySent = true;
+            sendEvent('game_ready', {
+              frame_count: frameCount,
+              detected_at: Date.now()
+            });
+          }
+          callback(timestamp);
+        });
+      }
+      return originalRAF.call(window, callback);
+    };
+  }
+
+  // --- First User Interaction Detection ---
+
+  function setupFirstInteractionDetection() {
+    var events = ['touchstart', 'mousedown', 'keydown'];
+
+    function onFirstInteraction() {
+      if (firstInteractionSent) return;
+      firstInteractionSent = true;
+      sendEvent('user_interaction_start', null);
+
+      for (var i = 0; i < events.length; i++) {
+        document.removeEventListener(events[i], onFirstInteraction, true);
+      }
+    }
+
+    for (var i = 0; i < events.length; i++) {
+      document.addEventListener(events[i], onFirstInteraction, true);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupFirstInteractionDetection);
+  } else {
+    setupFirstInteractionDetection();
+  }
+
+  // --- Auto Error Capture ---
+
+  window.addEventListener('error', function(event) {
+    if (errorSent) return;
+    errorSent = true;
+    sendEvent('error', {
+      message: event.message || 'Unknown error',
+      source: event.filename || '',
+      lineno: event.lineno || 0,
+      colno: event.colno || 0,
+      auto_captured: true
+    });
+  });
+
+  window.addEventListener('unhandledrejection', function(event) {
+    if (errorSent) return;
+    errorSent = true;
+    var reason = event.reason;
+    sendEvent('error', {
+      message: (reason instanceof Error) ? reason.message : String(reason),
+      type: 'unhandled_promise_rejection',
+      auto_captured: true
+    });
+  });
+
+  // --- Public API ---
+
+  window.playablesSDK = {
+    complete: function(score) {
+      sendEvent('game_ended', {
+        score: score,
+        completed: true
+      });
+    },
+
+    error: function(message) {
+      if (errorSent) return;
+      errorSent = true;
+      sendEvent('error', {
+        message: message || 'Unknown error',
+        auto_captured: false
+      });
+    },
+
+    sendEvent: function(eventName, payload) {
+      if (!eventName || typeof eventName !== 'string') return;
+      sendEvent(eventName, payload);
+    }
+  };
+
+  // Kick off rAF detection in case no game code calls rAF immediately
+  if (originalRAF) {
+    originalRAF.call(window, onFrame);
+  }
+})();</script>
+<!-- PLAYABLE_TOUCH_PATCH_V1 --><script>
+(function() {
+  if (window.__playableTouchPatchInstalled) return;
+  window.__playableTouchPatchInstalled = true;
+  var origAdd = EventTarget.prototype.addEventListener;
+  var blockedTypes = { touchstart: 1, touchmove: 1, wheel: 1 };
+  EventTarget.prototype.addEventListener = function(type, listener, options) {
+    if (blockedTypes[type]) {
+      if (options === undefined || options === null) {
+        options = { passive: true };
+      } else if (typeof options === 'boolean') {
+        options = { capture: options, passive: true };
+      } else {
+        options = Object.assign({}, options, { passive: true });
+      }
+    }
+    return origAdd.call(this, type, listener, options);
+  };
+})();
+</script><script>window.Intl=window.Intl||{};Intl.t=function(s){return(Intl._locale&&Intl._locale[s])||s;};</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WADHWA SIR CLASSROOM - Exercise 1.5</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    
+    :root {
+        --bg-primary: #fffaf5;
+        --bg-secondary: #ffffff;
+        --bg-card: #ffffff;
+        --text-primary: #1a120b;
+        --text-secondary: #4a3f35;
+        --text-muted: #7c6f65;
+        --border: #ffd4b8;
+        --accent: #E67E22;
+        --accent-hover: #D3711D;
+        --accent-2: #F39C12;
+        --accent-3: #FFB84D;
+        --gradient-1: linear-gradient(135deg, #E67E22 0%, #F39C12 100%);
+        --gradient-2: linear-gradient(135deg, #F39C12 0%, #FFB84D 100%);
+        --gradient-exit: linear-gradient(135deg, #D35400 0%, #E67E22 100%);
+        --gradient-think: linear-gradient(135deg, #ffd4b3 0%, #ffe0cc 100%);
+        --shadow-sm: 0 1px 2px 0 rgb(230 126 34 / 0.05);
+        --shadow-md: 0 4px 6px -1px rgb(230 126 34 / 0.1);
+        --shadow-lg: 0 10px 15px -3px rgb(230 126 34 / 0.1);
+        --shadow-xl: 0 20px 25px -5px rgb(230 126 34 / 0.15);
+    }
+
+    [data-theme="dark"] {
+        --bg-primary: #1E2433;
+        --bg-secondary: #2A3142;
+        --bg-card: #2A3142;
+        --text-primary: #E8EAED;
+        --text-secondary: #C9CED6;
+        --text-muted: #9AA0A6;
+        --border: #3C445A;
+        --accent: #E67E22;
+        --accent-hover: #F39C12;
+        --accent-2: #F39C12;
+        --accent-3: #FFB84D;
+        --gradient-1: linear-gradient(135deg, #E67E22 0%, #F39C12 100%);
+        --gradient-2: linear-gradient(135deg, #F39C12 0%, #FFB84D 100%);
+        --gradient-exit: linear-gradient(135deg, #D35400 0%, #E67E22 100%);
+        --gradient-think: linear-gradient(135deg, #3C445A 0%, #4A5469 100%);
+        --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.25);
+        --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3);
+        --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.35);
+        --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.4);
+    }
+
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: 'Inter', sans-serif;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        transition: background 0.3s ease, color 0.3s ease;
+        min-height: 100vh;
+    }
+
+    .glass-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        box-shadow: var(--shadow-lg);
+        transition: all 0.3s ease;
+    }
+
+    .glass-card:hover {
+        box-shadow: var(--shadow-xl);
+    }
+
+    .btn-gradient {
+        background: var(--gradient-1);
+        color: white;
+        border: none;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+        font-weight: 600;
+    }
+
+    .btn-gradient::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+        transition: left 0.5s ease;
+    }
+
+    .btn-gradient:hover::before {
+        left: 100%;
+    }
+
+    .btn-gradient:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px -5px rgba(230, 126, 34, 0.5);
+    }
+
+    .btn-gradient:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .btn-secondary {
+        background: var(--bg-secondary);
+        border: 2px solid var(--accent);
+        color: var(--accent);
+        transition: all 0.3s ease;
+        font-weight: 600;
+    }
+
+    .btn-secondary:hover {
+        background: var(--gradient-1);
+        color: white;
+        border-color: transparent;
+    }
+
+    .btn-secondary.active {
+        background: var(--gradient-1);
+        color: white;
+        border-color: transparent;
+    }
+
+    .btn-exit {
+        background: var(--gradient-exit);
+        color: white;
+        border: none;
+        transition: all 0.3s ease;
+    }
+
+    .btn-exit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px -5px rgba(211, 84, 0, 0.5);
+    }
+
+    .btn-nav {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        color: var(--text-primary);
+        transition: all 0.3s ease;
+    }
+
+    .btn-nav:hover {
+        background: var(--accent);
+        color: white;
+        border-color: var(--accent);
+        transform: translateY(-2px);
+    }
+
+    .btn-nav.active {
+        background: var(--gradient-1);
+        color: white;
+        border-color: var(--accent);
+        box-shadow: 0 4px 12px -2px rgba(230, 126, 34, 0.4);
+    }
+
+    .nav-button {
+        padding: 0.625rem 1.25rem;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.875rem;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: all 0.3s ease;
+    }
+
+    .control-button {
+        padding: 0.875rem 1.75rem;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.625rem;
+    }
+
+    .heading-gradient {
+        background: var(--gradient-1);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-weight: 800;
+    }
+
+    .heading-orange {
+        color: var(--accent);
+        font-weight: 800;
+    }
+
+    .circuit-img {
+        border: 3px solid var(--accent);
+        border-radius: 16px;
+        box-shadow: var(--shadow-md);
+        transition: all 0.3s ease;
+    }
+
+    .circuit-img:hover {
+        box-shadow: var(--shadow-xl);
+        transform: scale(1.02);
+    }
+
+    .content-section {
+        animation: fadeIn 0.5s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .math-content {
+        line-height: 2;
+        color: var(--text-secondary);
+        font-size: 1.0625rem;
+    }
+
+    .math-content strong {
+        color: var(--text-primary);
+        font-weight: 700;
+    }
+
+    .think-blink {
+        animation: blink 1.5s infinite;
+        color: var(--accent-2);
+        font-weight: 600;
+        font-size: 1.25rem;
+        text-align: center;
+        padding: 1rem;
+    }
+
+    @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+    }
+
+    .step-item {
+        opacity: 0;
+        transform: translateX(-20px);
+        animation: slideIn 0.5s forwards;
+        padding: 1rem;
+        margin: 0.75rem 0;
+        border-left: 4px solid var(--accent);
+        background: var(--bg-secondary);
+        border-radius: 8px;
+    }
+
+    @keyframes slideIn {
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    .summary-box {
+        background: var(--gradient-2);
+        color: white;
+        padding: 2rem;
+        border-radius: 16px;
+        text-align: center;
+        font-size: 1.125rem;
+        font-weight: 600;
+        box-shadow: var(--shadow-xl);
+    }
+
+    [data-theme="dark"] .summary-box {
+        color: #1E2433;
+    }
+
+    .hidden-flow {
+        display: none;
+    }
+
+    @media (max-width: 768px) {
+        .nav-button {
+            padding: 0.5rem 0.875rem;
+            font-size: 0.75rem;
+        }
+        .control-button {
+            padding: 0.75rem 1.25rem;
+            font-size: 0.875rem;
+        }
+    }
+
+    /* Playables SDK Touch Patch */
+    * {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    input, textarea {
+        -webkit-user-select: text;
+        user-select: text;
+    }
+</style>
+</head>
+<body data-theme="light">
+    <!-- Playables SDK Block -->
+    <script>
+        window.PlayablesSDK = window.PlayablesSDK || {
+            ready: false,
+            init: function() {
+                this.ready = true;
+                console.log('Playables SDK initialized');
+            },
+            exit: function() {
+                console.log('Playables SDK: Exit requested');
+                if (window.parent !== window) {
+                    window.parent.postMessage({ type: 'EXIT_PLAYABLE' }, '*');
+                }
+            }
+        };
+        
+        document.addEventListener('touchstart', function(e) {
+            if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'A' && e.target.tagName !== 'INPUT') {
+            }
+        }, { passive: true });
+    </script>
+
+    <div class="min-h-screen p-4 md:p-6 lg:p-8">
+        <!-- Header Section -->
+        <header class="max-w-7xl mx-auto mb-6">
+            <div class="glass-card p-5 md:p-7">
+                <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                    <div class="flex-1">
+                        <h1 class="text-3xl md:text-5xl font-bold heading-gradient mb-3">WADHWA SIR CLASSROOM</h1>
+                        <p class="text-base md:text-lg heading-orange font-bold mb-1">LOGIC</p>
+                        <p class="text-base md:text-lg heading-orange font-bold mb-1">EXERCISE 1.5</p>
+                        <p class="text-sm md:text-base text-muted font-semibold">BOARD EXPECTED SOLUTION</p>
+                    </div>
+                    <button id="exitBtn" class="btn-exit nav-button flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Exit
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation Buttons -->
+        <nav class="max-w-7xl mx-auto mb-6">
+            <div class="glass-card p-4">
+                <div class="flex flex-wrap gap-2 md:gap-3">
+                    <button id="darkModeBtn" class="btn-nav nav-button flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 0 0012 21a9.003 0 008.354-5.646z" />
+                        </svg>
+                        DARK MODE
+                    </button>
+                    <button class="btn-nav nav-button question-btn active" data-question="q1">QUESTION 1</button>
+                    <button class="btn-nav nav-button question-btn" data-question="q3a">QUESTION 3</button>
+                    <button class="btn-nav nav-button question-btn" data-question="q3b">QUESTION 3</button>
+                    <button class="btn-nav nav-button question-btn" data-question="q4">QUESTION 4</button>
+                    <button class="btn-nav nav-button question-btn" data-question="q5">QUESTION 5</button>
+                    <button class="btn-nav nav-button question-btn" data-question="summary">SUMMARY</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Controls -->
+        <div class="max-w-7xl mx-auto mb-6">
+            <div class="glass-card p-4 md:p-6">
+                <div class="flex flex-wrap items-center justify-center gap-3">
+                    <button id="playBtn" class="btn-gradient control-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Play
+                    </button>
+                    <button id="pauseBtn" class="btn-gradient control-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Pause
+                    </button>
+                    <button id="replayBtn" class="btn-gradient control-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Replay
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto">
+            <div class="glass-card p-6 md:p-8 lg:p-10">
+                <div id="contentArea" class="content-section">
+                    <!-- Question 1(i) Content -->
+                    <div id="q1-content" class="question-content">
+                        <h2 class="text-2xl md:text-3xl font-bold mb-6 heading-gradient">Question 1 (i)</h2>
+                        
+                        <!-- Question Section - Hidden Initially -->
+                        <div id="questionSection" class="hidden-flow">
+                            <div class="mb-8 flex justify-center">
+                                <img src="https://i.ibb.co/whvGmcVH/signal-2026-06-05-13-25-03-816.jpg" 
+                                     alt="Circuit Diagram for Question 1(i)" 
+                                     class="circuit-img w-full max-w-2xl h-auto">
+                            </div>
+                            <div class="math-content space-y-4" id="questionText">
+                                <p><strong>1. (i) In the circuit shown, calculate the equivalent resistance of the circuit and the current flowing in the circuit.</strong></p>
+                                <p>Given: Resistors R₁ = 4Ω and R₂ = 6Ω are connected in series with a battery of 10V.</p>
+                            </div>
+                        </div>
+
+                        <!-- Think On Your Own Section -->
+                        <div id="thinkSection" class="hidden-flow">
+                            <div class="think-blink">Think On Your Own</div>
+                            <div class="flex flex-wrap justify-center gap-4 mt-6">
+                                <button id="gotItBtn" class="btn-gradient control-button">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    I GOT IT
+                                </button>
+                                <button id="solutionBtn" class="btn-secondary control-button">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                                    </svg>
+                                    SOLUTION PLEASE
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Solution Mode Toggle -->
+                        <div id="modeSection" class="hidden-flow">
+                            <div class="flex flex-wrap justify-center gap-4 mb-6">
+                                <button id="stepByStepBtn" class="btn-secondary control-button active">
+                                    STEP BY STEP
+                                </button>
+                                <button id="nonStopBtn" class="btn-secondary control-button">
+                                    NON STOP
+                                </button>
+                            </div>
+                            <button id="nextStepBtn" class="btn-gradient control-button mx-auto hidden-flow">
+                                Next Step →
+                            </button>
+                        </div>
+
+                        <!-- Solution Section -->
+                        <div id="solutionSection" class="hidden-flow math-content space-y-2">
+                            <div class="step-item" data-step="1">
+                                <p><strong>Solution:</strong></p>
+                                <p><strong>Given:</strong> R₁ = 4Ω, R₂ = 6Ω, V = 10V</p>
+                            </div>
+                            <div class="step-item" data-step="2">
+                                <p><strong>Step 1: Equivalent Resistance</strong></p>
+                                <p>Since the resistors are connected in series, the equivalent resistance R is given by:</p>
+                                <p>R = R₁ + R₂</p>
+                                <p>R = 4Ω + 6Ω</p>
+                                <p><strong>R = 10Ω</strong></p>
+                            </div>
+                            <div class="step-item" data-step="3">
+                                <p><strong>Step 2: Current in the Circuit</strong></p>
+                                <p>By Ohm's Law: V = I × R</p>
+                                <p>Therefore, I = V / R</p>
+                                <p>I = 10V / 10Ω</p>
+                                <p><strong>I = 1A</strong></p>
+                            </div>
+                            <div class="step-item" data-step="4">
+                                <p><strong>Step 3: Verification</strong></p>
+                                <p>Voltage across 4Ω resistor: V₁ = I × R₁ = 1A × 4Ω = 4V</p>
+                                <p>Voltage across 6Ω resistor: V₂ = I × R₂ = 1A × 6Ω = 6V</p>
+                                <p>Total voltage: V₁ + V₂ = 4V + 6V = 10V (which equals battery voltage)</p>
+                            </div>
+                            <div class="step-item" data-step="5">
+                                <p><strong>Answer:</strong></p>
+                                <p>Equivalent resistance of the circuit = 10Ω</p>
+                                <p>Current flowing in the circuit = 1A</p>
+                            </div>
+                        </div>
+
+                        <!-- Summary Section -->
+                        <div id="summarySection" class="hidden-flow">
+                            <div class="summary-box">
+                                <h3 class="text-2xl font-bold mb-3">🎉 Excellent Work!</h3>
+                                <p>You've mastered series resistance and Ohm's Law concepts.</p>
+                                <p class="mt-2">Remember: In series, R<sub>total</sub> = R₁ + R₂ and current is same through all resistors.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Placeholder Sections -->
+                    <div id="q3a-content" class="question-content hidden">
+                        <h2 class="text-2xl md:text-3xl font-bold mb-6 heading-gradient">Question 3</h2>
+                        <p class="text-secondary">Content for Question 3 will be added here.</p>
+                    </div>
+
+                    <div id="q3b-content" class="question-content hidden">
+                        <h2 class="text-2xl md:text-3xl font-bold mb-6 heading-gradient">Question 3</h2>
+                        <p class="text-secondary">Content for Question 3 (duplicate) will be added here.</p>
+                    </div>
+
+                    <div id="q4-content" class="question-content hidden">
+                        <h2 class="text-2xl md:text-3xl font-bold mb-6 heading-gradient">Question 4</h2>
+                        <p class="text-secondary">Content for Question 4 will be added here.</p>
+                    </div>
+
+                    <div id="q5-content" class="question-content hidden">
+                        <h2 class="text-2xl md:text-3xl font-bold mb-6 heading-gradient">Question 5</h2>
+                        <p class="text-secondary">Content for Question 5 will be added here.</p>
+                    </div>
+
+                    <div id="summary-content" class="question-content hidden">
+                        <h2 class="text-2xl md:text-3xl font-bold mb-6 heading-gradient">Summary</h2>
+                        <div class="space-y-4 text-base md:text-lg text-secondary">
+                            <p><strong>Exercise 1.5 Summary</strong></p>
+                            <p>This exercise covers fundamental concepts of electric circuits including series connections, Ohm's law, and voltage division.</p>
+                            <p class="text-muted">Select individual questions from the navigation to view detailed solutions.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Initialize Playables SDK
+        PlayablesSDK.init();
+
+        // State Management
+        let currentState = 'initial'; // initial, question, think, solution, summary
+        let solutionMode = 'stepbystep'; // stepbystep, nonstop
+        let currentStep = 0;
+        let totalSteps = 5;
+        let utterance = null;
+        let isPaused = false;
+        let currentSpeakingText = '';
+
+        // DOM Elements
+        const questionSection = document.getElementById('questionSection');
+        const thinkSection = document.getElementById('thinkSection');
+        const modeSection = document.getElementById('modeSection');
+        const solutionSection = document.getElementById('solutionSection');
+        const summarySection = document.getElementById('summarySection');
+        const nextStepBtn = document.getElementById('nextStepBtn');
+
+        // Dark Mode
+        const darkModeBtn = document.getElementById('darkModeBtn');
+        const body = document.body;
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        body.setAttribute('data-theme', savedTheme);
+        updateDarkModeIcon(savedTheme);
+
+        darkModeBtn.addEventListener('click', () => {
+            const currentTheme = body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateDarkModeIcon(newTheme);
+        });
+
+        function updateDarkModeIcon(theme) {
+            const icon = darkModeBtn.querySelector('svg');
+            if (theme === 'dark') {
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />';
+            } else {
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />';
+            }
+        }
+
+        // Exit Button
+        document.getElementById('exitBtn').addEventListener('click', () => {
+            if (speechSynthesis.speaking) speechSynthesis.cancel();
+            PlayablesSDK.exit();
+        });
+
+        // Question Navigation
+        document.querySelectorAll('.question-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const questionId = btn.getAttribute('data-question');
+                if (speechSynthesis.speaking) speechSynthesis.cancel();
+                document.querySelectorAll('.question-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                document.querySelectorAll('.question-content').forEach(content => content.classList.add('hidden'));
+                document.getElementById(`${questionId}-content`).classList.remove('hidden');
+                resetFlow();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        });
+
+        // TTS Functions
+        function speakText(text, onEndCallback) {
+            if (!('speechSynthesis' in window)) {
+                alert('Text-to-Speech is not supported in your browser.');
+                return;
+            }
+            speechSynthesis.cancel();
+            utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 0.9;
+            utterance.pitch = 1;
+            utterance.volume = 1;
+            utterance.onend = () => {
+                isPaused = false;
+                if (onEndCallback) onEndCallback();
+            };
+            utterance.onerror = (e) => {
+                console.error('TTS Error:', e);
+                isPaused = false;
+            };
+            currentSpeakingText = text;
+            speechSynthesis.speak(utterance);
+        }
+
+        function getQuestionText() {
+            return document.getElementById('questionText').innerText;
+        }
+
+        function getStepText(stepNum) {
+            const step = document.querySelector(`[data-step="${stepNum}"]`);
+            return step ? step.innerText : '';
+        }
+
+        function getAllSolutionText() {
+            return solutionSection.innerText;
+        }
+
+        // Main Flow Controls
+        document.getElementById('playBtn').addEventListener('click', () => {
+            if (currentState === 'initial') {
+                startFlow();
+            } else if (isPaused && speechSynthesis.paused) {
+                speechSynthesis.resume();
+                isPaused = false;
+            } else if (!speechSynthesis.speaking) {
+                resumeFlow();
+            }
+        });
+
+        document.getElementById('pauseBtn').addEventListener('click', () => {
+            if (speechSynthesis.speaking && !speechSynthesis.paused) {
+                speechSynthesis.pause();
+                isPaused = true;
+            }
+        });
+
+        document.getElementById('replayBtn').addEventListener('click', () => {
+            speechSynthesis.cancel();
+            setTimeout(() => {
+                if (currentState === 'question') {
+                    speakText(getQuestionText(), () => showThinkSection());
+                } else if (currentState === 'solution' && solutionMode === 'stepbystep') {
+                    speakText(getStepText(currentStep), () => {
+                        if (currentStep < totalSteps) nextStepBtn.classList.remove('hidden-flow');
+                    });
+                } else if (currentState === 'solution' && solutionMode === 'nonstop') {
+                    speakText(getAllSolutionText());
+                }
+            }, 100);
+        });
+
+        // Flow Logic
+        function startFlow() {
+            currentState = 'question';
+            questionSection.classList.remove('hidden-flow');
+            questionSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            speakText(getQuestionText(), () => {
+                showThinkSection();
+            });
+        }
+
+        function showThinkSection() {
+            currentState = 'think';
+            thinkSection.classList.remove('hidden-flow');
+            thinkSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function resumeFlow() {
+            if (currentState === 'question') {
+                speakText(getQuestionText(), () => showThinkSection());
+            } else if (currentState === 'solution' && solutionMode === 'stepbystep' && currentStep > 0) {
+                speakText(getStepText(currentStep));
+            }
+        }
+
+        // I GOT IT Button
+        document.getElementById('gotItBtn').addEventListener('click', () => {
+            speechSynthesis.cancel();
+            currentState = 'summary';
+            thinkSection.classList.add('hidden-flow');
+            summarySection.classList.remove('hidden-flow');
+            summarySection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            speakText("Excellent Work! You've mastered series resistance and Ohm's Law concepts.");
+        });
+
+        // SOLUTION PLEASE Button
+        document.getElementById('solutionBtn').addEventListener('click', () => {
+            speechSynthesis.cancel();
+            currentState = 'solution';
+            thinkSection.classList.add('hidden-flow');
+            modeSection.classList.remove('hidden-flow');
+            modeSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+
+        // Mode Selection - STEP BY STEP default ON
+        document.getElementById('stepByStepBtn').addEventListener('click', () => {
+            solutionMode = 'stepbystep';
+            document.getElementById('stepByStepBtn').classList.add('active');
+            document.getElementById('nonStopBtn').classList.remove('active');
+            startStepByStep();
+        });
+
+        document.getElementById('nonStopBtn').addEventListener('click', () => {
+            solutionMode = 'nonstop';
+            document.getElementById('nonStopBtn').classList.add('active');
+            document.getElementById('stepByStepBtn').classList.remove('active');
+            startNonStop();
+        });
+
+        function startStepByStep() {
+            currentStep = 1;
+            solutionSection.classList.remove('hidden-flow');
+            document.querySelectorAll('.step-item').forEach(item => {
+                item.style.display = 'none';
+            });
+            showStep(currentStep);
+        }
+
+        function showStep(stepNum) {
+            const step = document.querySelector(`[data-step="${stepNum}"]`);
+            if (step) {
+                step.style.display = 'block';
+                step.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                speakText(getStepText(stepNum), () => {
+                    if (stepNum < totalSteps) {
+                        nextStepBtn.classList.remove('hidden-flow');
+                    } else {
+                        nextStepBtn.classList.add('hidden-flow');
+                    }
+                });
+            }
+        }
+
+        nextStepBtn.addEventListener('click', () => {
+            nextStepBtn.classList.add('hidden-flow');
+            currentStep++;
+            if (currentStep <= totalSteps) {
+                showStep(currentStep);
+            }
+        });
+
+        function startNonStop() {
+            solutionSection.classList.remove('hidden-flow');
+            document.querySelectorAll('.step-item').forEach(item => {
+                item.style.display = 'block';
+            });
+            nextStepBtn.classList.add('hidden-flow');
+            solutionSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            speakText(getAllSolutionText());
+        }
+
+        function resetFlow() {
+            currentState = 'initial';
+            currentStep = 0;
+            solutionMode = 'stepbystep';
+            questionSection.classList.add('hidden-flow');
+            thinkSection.classList.add('hidden-flow');
+            modeSection.classList.add('hidden-flow');
+            solutionSection.classList.add('hidden-flow');
+            summarySection.classList.add('hidden-flow');
+            nextStepBtn.classList.add('hidden-flow');
+            document.getElementById('stepByStepBtn').classList.add('active');
+            document.getElementById('nonStopBtn').classList.remove('active');
+        }
+
+        // Back Button Logic
+        window.addEventListener('pagehide', () => {
+            if (speechSynthesis.speaking) speechSynthesis.cancel();
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (speechSynthesis.speaking) speechSynthesis.cancel();
+        });
+    </script>
+<script>(function(){document.addEventListener("click",function(e){var a=e.target.closest("[data-product-id]");if(!a)return;e.preventDefault();var pid=a.getAttribute("data-product-id");if(pid)parent.postMessage({type:"ecto-artifact-link-click",productId:pid},"*")})})();</script>
+</body>
+</html>
